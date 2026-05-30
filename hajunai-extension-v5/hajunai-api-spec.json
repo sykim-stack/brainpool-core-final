@@ -1,0 +1,8 @@
+{
+    "baseUrl": "http://localhost:3000",
+    "projectName": "BRAINPOOL OS",
+    "routes": [
+      { "path": "/api/debug/health", "method": "GET", "description": "헬스체크" },
+      { "path": "/api/chat/rooms", "method": "GET", "description": "CoreChat 방 목록" }
+    ]
+  }

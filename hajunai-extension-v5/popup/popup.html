@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>HajunAI v5.1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg:#0D1117; --bg2:#161B22; --bg3:#21262D; --border:#30363D;
+    --accent:#58A6FF; --accent2:#3FB950; --warn:#F78166;
+    --text:#E6EDF3; --text2:#8B949E; --text3:#484F58; --radius:8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body { 
+    width: 560px; min-height: 600px; background: var(--bg); 
+    color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px;
+    overflow-y: auto; overflow-x: hidden;
+  }
+
+  .header { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .header-left { display:flex; align-items:center; gap:8px; }
+  .logo { width:28px; height:28px; background:linear-gradient(135deg,#58A6FF,#3FB950); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; color:#0D1117; }
+  .header-title { font-weight:700; font-size:14px; }
+  .header-sub { font-size:10px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:var(--accent2); box-shadow:0 0 6px var(--accent2); }
+  .status-dot.offline { background:var(--warn); box-shadow:0 0 6px var(--warn); }
+
+  .tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); padding:0 4px; overflow-x:auto; }
+  .tab { padding:8px 12px; font-size:12px; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; flex-shrink:0; }
+  .tab:hover { color:var(--text); }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .content { padding:14px 16px; display:none; }
+  .content.active { display:block; }
+
+  .section-label { font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; font-family:'JetBrains Mono',monospace; }
+  .btn { width:100%; padding:10px; border-radius:var(--radius); border:none; font-family:'Noto Sans KR',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .btn-primary { background:var(--accent); color:#0D1117; }
+  .btn-primary:hover { background:#79B8FF; }
+  .btn-sm { background:var(--bg2); border:1px solid var(--border); color:var(--text2); padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+  .btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-secondary { background:var(--bg2); border:1px solid var(--border); color:var(--text2); margin-top:8px; font-size:12px; padding:8px; }
+  .btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+
+  .record-card { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:10px; margin-bottom:8px; }
+  .record-top { display:flex; justify-content:space-between; margin-bottom:4px; }
+  .record-project { font-weight:700; font-size:11px; }
+  .record-time { font-size:10px; color:var(--text3); }
+  .empty, .loading-state { text-align:center; color:var(--text3); padding:20px; font-size:12px; }
+  .gap { margin-bottom:12px; }
+  .gap-sm { margin-bottom:8px; }
+
+  input, textarea { width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:10px 12px; font-size:14px; outline:none; }
+  input:focus, textarea:focus { border-color:var(--accent); }
+
+  .ai-list { display:flex; flex-direction:column; gap:6px; }
+  .ai-item { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:var(--bg2); border-radius:6px; border:1px solid var(--border); }
+  .ai-name { font-weight:500; font-size:12px; }
+  .ai-status { font-size:10px; padding:2px 8px; border-radius:4px; background:var(--bg3); color:var(--text2); }
+  .ai-status.active { background:#238636; color:#fff; }
+
+  .snapshot-count { font-size:24px; font-weight:700; color:var(--accent); font-family:'JetBrains Mono',monospace; margin-bottom:4px; }
+  .snapshot-label { font-size:11px; color:var(--text2); margin-bottom:12px; }
+
+  #manualInput { display:none; margin-top:8px; }
+  #manualInput.active { display:block; }
+
+  .footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; margin-top:auto; }
+  .footer-text { font-size:10px; color:var(--text3); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">HJ</div>
+    <div><div class="header-title">HajunAI</div><div class="header-sub">BRAINPOOL 관제탑 v5.1</div></div>
+  </div>
+  <div class="status-dot" id="statusDot"></div>
+</div>
+
+<!-- 6개 탭 -->
+<div class="tabs">
+  <div class="tab active" data-tab="validate">🔍 검증</div>
+  <div class="tab" data-tab="inject">💉 주입</div>
+  <div class="tab" data-tab="status">💚 상태</div>
+  <div class="tab" data-tab="action">📋 행동</div>
+  <div class="tab" data-tab="schedule">📅 일정</div>
+  <div class="tab" data-tab="settings">⚙️ 설정</div>
+</div>
+
+<!-- 🔍 검증 탭 -->
+<div class="content active" id="tab-validate">
+  <div class="gap" style="display:flex; justify-content:space-between; align-items:center;">
+    <div class="section-label">📋 Claude 결과 붙여넣기</div>
+    <button class="btn-sm" id="clearValidateBtn">🗑️ 초기화</button>
+  </div>
+  <div class="gap">
+    <textarea id="resultInput" style="min-height:200px;" placeholder="Claude가 생성한 코드를 여기에 붙여넣으세요..."></textarea>
+  </div>
+  <button class="btn btn-primary" id="validateBtn">🛡️ 계약서 검사 실행</button>
+
+  <div class="gap" style="margin-top:16px;">
+    <div class="section-label">📊 검증 결과</div>
+    <div id="resultBox" class="record-card" style="min-height:80px; white-space:pre-wrap; font-size:12px; color:var(--text2);">검사 버튼을 클릭하면 결과가 여기에 표시됩니다.</div>
+  </div>
+
+  <div id="repromptArea" style="display:none; margin-top:16px;">
+    <div class="section-label">🚀 Claude 재투입 프롬프트</div>
+    <div id="repromptBox" class="record-card" style="min-height:80px; white-space:pre-wrap; font-size:12px; color:var(--text2);"></div>
+    <button class="btn btn-primary" id="copyRepromptBtn" style="margin-top:8px;">📋 재질문 복사하기</button>
+  </div>
+</div>
+
+<!-- 💉 주입 탭 -->
+<div class="content" id="tab-inject">
+  <div class="gap">
+    <div class="section-label">📝 주입할 문서 선택</div>
+    <div id="docList"><div class="empty">문서를 불러오는 중...</div></div>
+  </div>
+  <div class="gap">
+    <div class="section-label">🎯 템플릿 선택</div>
+    <div style="display:flex; gap:6px;" id="templateBtns">
+      <button class="btn-sm template-btn active" data-template="development">🛠️ 개발</button>
+      <button class="btn-sm template-btn" data-template="debug">🔍 디버깅</button>
+      <button class="btn-sm template-btn" data-template="review">📋 리뷰</button>
+    </div>
+  </div>
+  <div class="gap">
+    <div class="section-label">📋 생성된 프롬프트</div>
+    <div id="promptPreview" class="record-card" style="min-height:100px; font-size:12px; color:var(--text2);">템플릿을 선택하면 프롬프트가 여기에 표시됩니다</div>
+  </div>
+  <button class="btn btn-primary" id="btnCopyPrompt">📋 클립보드에 복사하기</button>
+
+  <!-- 💉 이어서 주입 (신규) -->
+  <div class="gap" style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+    <div class="section-label">🔄 이어서 주입</div>
+    <div class="record-card">
+      <div class="record-top"><span class="record-project">마지막 작업</span></div>
+      <div id="injectLastTask" style="font-size:12px; color:var(--text2);">-</div>
+    </div>
+    <button class="btn btn-primary" id="btnInjectContinue" style="background:var(--accent2);">💉 "어제 이어서" 프롬프트 생성</button>
+  </div>
+</div>
+
+<!-- 💚 상태 탭 -->
+<div class="content" id="tab-status">
+  <div class="gap">
+    <div class="section-label">🩺 BRAINPOOL 상태</div>
+    <button class="btn-sm" id="btnRefreshHealth">🔄 새로고침</button>
+  </div>
+  <div id="healthResults"><div class="empty">💚 상태 탭을 클릭하면 자동 점검됩니다</div></div>
+  <div class="gap-sm" style="margin-top:8px; color:var(--text3); font-size:10px;">마지막 확인: <span id="lastCheckTime">-</span></div>
+</div>
+
+<!-- 📋 행동 탭 -->
+<div class="content" id="tab-action">
+  <div class="gap">
+    <div class="section-label">📋 오늘 상태</div>
+    <div class="record-card">
+      <div class="record-top"><span class="record-project">마지막 작업</span></div>
+      <div id="actionLastTask">CoreRing 테스트</div>
+    </div>
+    <div class="record-card">
+      <div class="record-top"><span class="record-project">⚠️ 문제</span></div>
+      <div id="actionProblem">번역 지연 발생</div>
+    </div>
+  </div>
+  <button class="btn btn-primary" id="btnAction">🚀 문제 해결 시작</button>
+  <!-- 📋 행동 탭 내부, 기존 내용 아래에 추가 -->
+<div class="gap" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+  <div class="section-label">🎯 Action Engine</div>
+  <div id="actionEngineContainer">
+    <div class="record-card" style="border-left: 4px solid var(--text3);">
+      <div style="font-size: 12px; color: var(--text2);">대화를 저장하면 다음 행동이 추천됩니다.</div>
+    </div>
+  </div>
+</div>
+
+  <!-- 📸 스냅샷 (신규) -->
+  <div class="gap" style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+    <div class="section-label">📸 AI 대화 스냅샷</div>
+    <div class="ai-list" id="aiList">
+      <div class="loading-state">탭을 스캔하는 중...</div>
+    </div>
+    <div class="snapshot-count" id="snapshotCount" style="margin-top:12px;">-</div>
+    <div class="snapshot-label">오늘 저장된 대화</div>
+    <button class="btn btn-primary" id="btnSaveNow" disabled>📸 지금 저장</button>
+    <button class="btn btn-secondary" id="btnToggleManual">✏️ 수동 입력</button>
+    <div id="manualInput">
+      <textarea id="manualText" rows="4" placeholder="AI 대화 내용을 여기에 붙여넣으세요..."></textarea>
+      <input type="text" id="manualTitle" placeholder="제목 (선택)">
+      <button class="btn btn-primary" id="btnManualSave">💾 수동 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 📅 일정 탭 -->
+<div class="content" id="tab-schedule">
+  <div class="gap">
+    <div class="section-label">📅 예정된 일정</div>
+    <button class="btn-sm" id="btnRefreshSchedule">🔄 새로고침</button>
+  </div>
+  <div id="scheduleList"><div class="empty">일정을 불러오는 중...</div></div>
+  <div class="gap" style="margin-top:16px; background:var(--bg3); border-radius:var(--radius); padding:14px;">
+    <div class="section-label">+ 새 일정 추가</div>
+    <input type="text" id="scheduleTitle" placeholder="일정 제목 (예: 어머니 병원)" style="margin-bottom:8px;">
+    <input type="date" id="scheduleDate" style="margin-bottom:12px;">
+    <button class="btn btn-primary" id="btnAddSchedule" style="min-height:56px; font-size:18px;">📅 일정 저장하기</button>
+  </div>
+</div>
+
+<!-- ⚙️ 설정 탭 -->
+<div class="content" id="tab-settings">
+  <div class="section-label" style="margin-bottom:10px;">연결 설정</div>
+  <div class="gap">
+    <div class="section-label">Supabase URL</div>
+    <input type="text" id="settingUrl" placeholder="https://xxxx.supabase.co">
+  </div>
+  <div class="gap">
+    <div class="section-label">Supabase Anon Key</div>
+    <input type="password" id="settingKey">
+  </div>
+  <div class="gap">
+    <div class="section-label">Notion API Key</div>
+    <input type="password" id="settingNotionKey" placeholder="secret_...">
+  </div>
+  <div class="gap">
+    <div class="section-label">Notion Database ID</div>
+    <input type="text" id="settingNotionDbId" placeholder="데이터베이스 ID">
+  </div>
+  <div class="gap">
+    <div class="section-label">Gemini API Key</div>
+    <input type="password" id="settingGeminiKey" placeholder="AIzaSy...">
+  </div>
+  <button class="btn btn-primary" id="btnSaveSettings">💾 설정 저장</button>
+  <div style="margin-top:12px; font-size:10px; color:var(--text3);">버전: v5.1.0</div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
