@@ -1,0 +1,409 @@
+BRAINPOOL OS
+전체 현황 & 설계 문서
+클로2 작성 · 2026-05-31
+1. BRAINPOOL은 무엇인가
+BRAINPOOL은 앱들의 집합이 아니라 하나의 생명체다.
+기능을 제공하는 플랫폼이 아니다. 사람들이 언어, 거리, 문화의 장벽을 넘어 자연스럽게 관계를 만들고 유지할 수 있는 디지털 생활권을 만드는 것이 목표다.
+사용자는 서비스를 사용하는 것이 아니라 생활 공간을 방문한다.
+
+각 Core는 장기이며, brainpool-os는 이 장기들을 연결하는 신경망이다.
+새로운 기능을 추가하는 것보다 장기 간 경계를 유지하는 것이 더 중요하다.
+모듈화의 목적은 개발 편의가 아니라 생존성이다. 한 모듈이 실패해도 전체 시스템은 살아남아야 한다.
+
+1.1 Hidden Picture 철학
+기능을 보여주지 않는다. 자연스럽게 흘러가게 한다.
+사용자는 번역 앱인 줄 알고 들어온다. 대화하다 보면 공간이 생기고, 관계가 쌓이고, 어느 날 창고가 열린다. 강요 없이 흐름으로.
+
+이 철학은 설계에도 그대로 적용된다.
+광장 / 마당 / 거실 / 서재 / 창고 = 전부 필터
+실제로 만드는 것 = room 테이블 + post 테이블
+겉으로는 복잡한 생활권 / 뒤에서는 단순한 구조
+
+2. BRAINPOOL 인체 구조
+BRAINPOOL의 각 Core는 인체의 장기에 비유된다.
+
+Core
+인체
+역할
+금지
+CoreRing
+입
+언어 번역, 표현, 방언 감지
+저장, 커뮤니티 기능
+CoreChat
+말의 흐름
+관계, 대화, 소통, 푸시 알림
+렌더링, 쇼핑 기능
+CoreNull
+몸통
+생활 공간 제공
+비즈니스 로직, SNS 피드
+MindWorld
+기억
+발화 뒤 의도, 맥락, 패턴
+-
+HajunAI
+머리
+판단, 분석, 추천
+거대 엔진 (초기)
+CoreRoad
+손발
+이동, 배송, 물류
+-
+CoreHub
+신경계
+창고 운영, 연결, 분석
+-
+
+
+2.1 전체 구조
+brainpool-os (엔진 모음)
+  ├── CoreRing   → 번역
+  ├── CoreChat   → 대화
+  ├── HajunAI   → 기억/분석
+  └── CoreRoad  → 물류
+
+CoreNull (생활 공간)
+  ├── 광장 / 방 / 포스트
+  ├── 서재
+  └── 창고
+        └── CoreHub (경제 운영)
+
+3. CoreNull 기획 (Phase 1)
+3.1 핵심 원칙
+CoreNull은 공간 제공만 한다. 대화와 번역은 CoreChat/CoreRing에 위임한다.
+만들어야 하는 것은 딱 두 개다.
+1. room 테이블
+2. post 테이블
+나머지(광장, 마당, 거실, 서재)는 전부 쿼리 필터로 뷰만 다르게 보여주는 것이다.
+
+3.2 공간 구조
+공유 영역 (공용)
+  국가광장
+    └── 도시광장
+          └── 지역광장
+                └── 동네광장 (포스팅 성격으로 필터 배포)
+
+개인 영역 (집주인 소유)
+  마당
+    └── 거실
+          └── 방 (포스팅 작성)
+                └── 서재
+                      └── 창고 (히든)
+
+3.3 방 (Room) 구조
+방은 집주인만 생성 가능하다. 모든 방은 동일한 구조이며 성격만 다르다.
+
+속성
+값
+설명
+room_type
+normal / event
+일반방 또는 이벤트방
+공개범위
+public / friend / family
+초대 기반 접근 제어
+URL
+기본 히든
+항상 URL 생성, 기본은 숨김
+event ON
+독립 URL 공개 배포
+이벤트 모드 시 공개
+
+
+3.4 포스트 (Post) 기능
+포스트는 단일 구조로 광장까지 모두 동일하게 사용된다.
+
+기능
+설명
+Phase
+이미지 업로드
+Cloudinary 업로드
+1
+AI 캡션 추천
+Gemini API 호출
+1
+관심
+방 단위 저장 → 서재에 보관
+1
+댓글
+CoreChat/CoreRing 번역 폼
+1
+공유
+카카오 / 잘로
+1
+스토리 생성
+이벤트 모드 ON 시 독립 URL 발행
+2
+
+
+3.5 관심 (Interest)
+좋아요가 아니다. 발자취 수집이다.
+
+관심 누름
+  ↓
+서재에 자동 저장
+  ↓
+나중에 재방문 / 재탄생
+
+구분
+의미
+발자취 (자동)
+내가 다녀간 방 기록
+관심 (수동)
+내가 저장한 방
+
+
+3.6 서재 (Library)
+기억 보관소다. 삭제가 없다. 숨김 → 보관 → 재탄생.
+
+기능
+설명
+발자취
+자동 저장 (다녀간 방)
+관심
+수동 저장 (저장한 방)
+숨긴 포스트
+삭제 아님, 보관
+타임라인
+이벤트 종료 시 자동 보관
+재탄생
+보관된 포스트 → 새 포스트로 발행
+
+
+서재 타임라인 예시:
+2024 하준백일
+2025 결혼
+2026 하준돌
+...
+
+3.7 이벤트 방 생애주기
+일반 청첩장은 결과물(웨딩사진)만 있다. CoreNull 이벤트는 여정 전체다.
+
+결혼방 생성 (room_type: event)
+  ↓
+준비 과정 포스팅 쌓임
+  (집 보러 다님, 가구 선별, 결혼식장 예약)
+  ↓
+이벤트 ON → 독립 URL 공개
+  (청첩장 = 준비과정 + 결혼식 전체)
+  ↓
+이벤트 종료
+  ↓
+서재 타임라인에 자동 보관
+
+3.8 창고 (경제 시스템)
+쇼핑몰이 아니다. 관계를 만든 사람에게 보상을 돌려주는 BRAINPOOL 경제 시스템이다.
+
+관계 형성 (방/포스트/댓글)
+  ↓
+활동점수 축적 (HajunAI 분석)
+  ↓
+키워드 생성 (사용자가 실제 만든)
+  ↓
+창고 오픈
+  ↓
+수익 배분
+
+Phase
+내용
+Phase 0
+활동점수 설계, 관계 키워드 생성 구조
+Phase 1
+창고 오픈 조건
+Phase 2
+수익배분 모델
+
+
+3.9 CoreNull 공간 요약
+공간
+역할
+Phase
+광장
+발견 (필터)
+1
+거실
+관계 (필터)
+2
+방
+이야기 (포스팅)
+1
+서재
+기억 (보관/재탄생)
+2
+창고
+경제 (CoreHub 연결)
+3
+
+
+4. 현재 개발 완료 현황
+4.1 brainpool-clean (현재 운영 레포)
+모듈
+상태
+비고
+CoreRing
+완료
+번역기 + 번역기 모드
+CoreChat
+완료
+채팅 + 푸시 알림
+CorePhrase
+완료
+단어장 + 학습 모드
+CoreNullLayer
+완료
+방언 사전 정리
+음성 저장
+진행중
+완성 필요
+RLS 보안 설정
+진행중
+완성 필요
+
+
+4.2 API 라우트 현황
+Vercel Hobby 한도: 12개. 현재 12개 사용 중. 통합 작업으로 8개로 축소 예정.
+
+라우트
+역할
+/api/brainpool
+CoreRing 번역 진입점
+/api/brainpool/learn
+Hajun 라우터 번역/학습
+/api/chat/join
+채팅방 참여
+/api/chat/poll
+메시지 폴링
+/api/chat/rooms/[roomId]
+채팅방 조회/삭제
+/api/chat/rooms
+채팅방 생성/목록
+/api/chat/send
+메시지 전송
+/api/chat/trace
+메시지 추적
+/api/corenull
+단어 데이터, 충돌 보고
+/api/debug/health
+헬스체크
+/api/notion/sync
+Notion 동기화
+/api/search
+검색
+
+
+4.3 DB 스키마 현황
+테이블
+상태
+용도
+messages
+운영중
+통합 메시지 (post/comment/chat/event)
+chat_rooms
+운영중
+채팅방 관리
+chat_participants
+운영중
+참여자 관리
+chat_messages
+레거시
+messages로 통합 예정
+tp_translations
+운영중
+단어 사전
+tp_conflicts
+운영중
+번역 충돌 보고
+tb_trans_logs
+운영중
+번역 로그
+corenull_houses 외
+미구현
+Phase 1 설계 필요
+
+
+4.4 HajunAI 확장 프로그램
+항목
+상태
+HajunCore 폴더 구조
+완료
+index.js 메인 진입점
+완료
+inject/index.js 맥락주입
+완료
+schedule/index.js 일정 관리
+완료
+core/layers/snapshot.js
+완료
+storage/project.js
+완료
+background.js HajunCore 호출 구조
+완료
+popup.js InjectLayer 교체
+예정
+Supabase Storage Layer 연결
+예정
+
+
+5. 코딩 계약 (절대 준수)
+모든 팀원(AI 포함)이 반드시 지켜야 하는 계약이다.
+
+규칙
+내용
+함수 형식
+(ctx) => ctx 형식 필수
+에러 처리
+throw 절대 금지 → _error 반환만
+요청 파싱
+req.text() + JSON.parse() (req.json() 금지)
+HTTP 응답
+200 또는 500만
+추적
+모든 요청에 traceId 필수
+CSS
+var(--*) 토큰만. raw px/hex/rgba/opacity 금지
+API 한도
+Vercel Hobby 12개 한도
+금지
+DI 컨테이너, 이벤트 버스, 레이어간 HTTP 호출
+
+
+6. 다음 작업 순서
+순서
+작업
+비고
+1
+음성 저장 완성
+brainpool-clean
+2
+RLS 보안 설정
+Supabase
+3
+API 12 → 8개 통합
+Vercel 한도 여유 확보
+4
+CoreNull Phase 1 DB 설계
+room + post 테이블
+5
+CoreNull Phase 1 구현
+방 + 포스트
+6
+CoreHub Phase 1
+창고 연결
+7
+CoreRing Phase 1
+50세션 로그 후
+
+
+BRAINPOOL은 생명체다.
+언어 → 관계 → 생활 → 기억 → 판단 → 이동 → 경제가 순환한다.
+
+
+기기를 분실할 경우를 대비하여 이 복구 코드를 복사하여 보관하세요.
+
+11139e4e-c82cbcc6
+28dcf309-837c61c7
+944e2d8f-3ba02c57
+5a8bb3d0-8cab369f
+a21380ba-8bfdeabf
+73e922a6-c8be2df3

@@ -2,11 +2,12 @@
 // 기능: AI 탭 감지 + 저장 + 요약/프롬프트 표시 + Action Engine + 이어가기 프롬프트 복사
 // HajunCore import (Chrome Extension 환경)
 
-// ========== HajunCore 로드 (안전 버전) ==========
+// ========== HajunCore 로드 (popup 전용) ==========
 let InjectLayer = null;
 
 async function loadHajunCore() {
   try {
+    // popup 폴더 기준으로 src 상위 경로 지정
     const module = await import(chrome.runtime.getURL('src/hajuncore/index.js'));
     InjectLayer = module.InjectLayer;
     console.log("[popup] ✅ HajunCore InjectLayer 로드 성공");
@@ -14,6 +15,9 @@ async function loadHajunCore() {
     console.error("[popup] ❌ HajunCore 로드 실패", e);
   }
 }
+
+// DOMContentLoaded 전에 호출
+loadHajunCore();
 
 // DOMContentLoaded 전에 호출
 loadHajunCore();

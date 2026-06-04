@@ -1,22 +1,5 @@
 ﻿// BRAINPOOL Core Extension — 최종 통합 popup.js
 // 기능: AI 탭 감지 + 저장 + 요약/프롬프트 표시 + Action Engine + 이어가기 프롬프트 복사
-// HajunCore import (Chrome Extension 환경)
-
-// ========== HajunCore 로드 (안전 버전) ==========
-let InjectLayer = null;
-
-async function loadHajunCore() {
-  try {
-    const module = await import(chrome.runtime.getURL('src/hajuncore/index.js'));
-    InjectLayer = module.InjectLayer;
-    console.log("[popup] ✅ HajunCore InjectLayer 로드 성공");
-  } catch (e) {
-    console.error("[popup] ❌ HajunCore 로드 실패", e);
-  }
-}
-
-// DOMContentLoaded 전에 호출
-loadHajunCore();
 
 // ========== 1. 공통 유틸리티 ==========
 function getSupabaseCredentials() {
@@ -398,14 +381,8 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ========== 9. 이어가기 프롬프트 생성 (HajunCore InjectLayer v0.2) ==========
+// ========== 9. 이어가기 프롬프트 생성 (버튼용) ==========
 async function generateContinuePrompt() {
-  const btn = document.getElementById('btnInjectContinue') || document.getElementById('btnContinueContext');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = '⏳ HajunAI 맥락 분석 중...';
-  }
-
   try {
     const { supabaseUrl, supabaseKey } = await getSupabaseCredentials();
     if (!supabaseUrl || !supabaseKey) {
@@ -416,50 +393,56 @@ async function generateContinuePrompt() {
     const res = await fetch(`${supabaseUrl}/rest/v1/contexts?order=updated_at.desc&limit=1`, {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    let contexts = [];
+    try { contexts = JSON.parse(text); } catch(e) { throw new Error('응답 파싱 실패'); }
+    if (contexts.length === 0) throw new Error('저장된 맥락 없음');
 
-    if (!res.ok) throw new Error('contexts 로드 실패');
+    const ctx = contexts[0];
+    
+    let rawSummary = ctx.summary || '';
+    let nextAction = ctx.next_action || '';
+    let lastTask = ctx.last_task || '';
+    let prompt = '';
+    
+    if (rawSummary.length > 100 && !rawSummary.includes('분석중') && !rawSummary.includes('작업 진행 중')) {
+      let truncatedSummary = rawSummary.length > 800 ? rawSummary.substring(0, 800) + '…(중략)' : rawSummary;
+      prompt = `🦁 BRAINPOOL Core — 지난 대화 이야기를 이어갑니다.
 
-    const contexts = await res.json();
-    const latest = contexts[0] || {};
+📖 대화 내용 (요약)
+${truncatedSummary}
 
-// HajunCore InjectLayer 호출 부분 (generateContinuePrompt 함수 안)
-const injectCtx = {
-  lastTask: latest.last_task || 'HajunAI 작업 진행 중',
-  summary: latest.summary || '',
-  nextAction: latest.next_action || '',
-  currentProblems: latest.current_problems || '',
-  recentConversations: latest.recent_summary ? [latest.recent_summary] : [],
-  action: 'inject'
-};
+🎯 마지막에 논의한 작업
+${lastTask || '구체적인 작업을 논의 중'}
 
-const result = InjectLayer(injectCtx);
+🚀 다음에 할 일
+${nextAction || '맥락을 검토하고 자연스럽게 이어가기'}
 
-    if (result._error) throw new Error(result._error);
+---
+위 내용은 당신과 사용자가 나눈 대화의 흐름입니다. 
+사용자가 이어서 작업을 요청했습니다. 자연스럽게 이전 맥락을 유지하며 대화를 계속 진행해주세요.
+(자동 실행 없음 / 복사 후 AI 채팅창에 붙여넣기)`;
+    } else {
+      prompt = `🦁 BRAINPOOL Core — 이전 대화를 이어갑니다.
 
-    if (result.injectionPrompt) {
-      await navigator.clipboard.writeText(result.injectionPrompt);
-      
-      alert('✅ HajunAI 강력 맥락 주입 프롬프트가 복사되었습니다!\n\nAI 채팅창에 바로 붙여넣으세요.');
+📌 마지막 작업
+${lastTask || '대화 기록 없음'}
 
-      // UI 업데이트
-      const promptBox = document.getElementById('promptBox');
-      const summaryArea = document.getElementById('summaryArea');
-      if (promptBox && summaryArea) {
-        promptBox.innerText = result.injectionPrompt.length > 700 
-          ? result.injectionPrompt.substring(0, 700) + '...' 
-          : result.injectionPrompt;
-        summaryArea.style.display = 'block';
-      }
+📝 간단 요약
+${rawSummary || '저장된 대화 내용이 없습니다.'}
+
+🎯 다음 행동
+${nextAction || '대화를 더 나눠보거나, 원하는 주제를 알려주세요.'}
+
+---
+위 내용을 참고하여 이전 맥락을 유지하며 작업을 이어서 진행해주세요.`;
     }
-
-  } catch (e) {
-    console.error(e);
-    alert(`❌ 맥락 주입 실패: ${e.message}`);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '💉 "어제 이어서" 프롬프트 생성';
-    }
+    
+    await navigator.clipboard.writeText(prompt);
+    alert('✅ 이야기 프롬프트가 복사되었습니다.\nClaude/ChatGPT에 붙여넣으면 맥락을 이어갑니다.');
+  } catch(e) {
+    alert(`❌ 실패: ${e.message}`);
   }
 }
 
@@ -507,83 +490,3 @@ if (copyBtn) {
 
 
 
-async function saveCurrentConversation() {
-  const btn = document.getElementById("btnSaveNow");
-  if (!btn) return;
-
-  if (currentTabs.length === 0) {
-    alert("저장할 AI 탭이 없습니다.\nAI 탭을 열어주세요.");
-    return;
-  }
-
-  const tab = currentTabs[0];
-  btn.disabled = true;
-  btn.textContent = "⏳ HajunCore 저장 중...";
-
-  try {
-    let result;
-    try {
-      const ping = await chrome.tabs.sendMessage(tab.id, { type: "PING" });
-      if (ping === "pong") {
-        result = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_CONVERSATION" });
-      } else throw new Error("Ping failed");
-    } catch(e) {
-      const injectResult = await sendMessageToBg({ type: "INJECT_CONTENT_SCRIPT", tabId: tab.id });
-      if (!injectResult?.success) throw new Error("content.js 주입 실패");
-      await new Promise(r => setTimeout(r, 500));
-      result = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_CONVERSATION" });
-    }
-
-    if (result?.error) throw new Error(result.error);
-    if (!result?.text) throw new Error("대화 내용 없음");
-
-    // ==================== HajunCore SnapshotLayer 호출 ====================
-    const saveResult = await sendMessageToBg({
-      type: "MANUAL_SNAPSHOT",
-      data: { 
-        text: result.text, 
-        title: result.title || getAIName(tab.url), 
-        url: result.url, 
-        ai: result.ai 
-      }
-    });
-
-    if (saveResult?.error) throw new Error(saveResult.error);
-
-    btn.textContent = "✅ 저장 완료!";
-
-    // ==================== InjectLayer로 바로 주입 프롬프트 생성 ====================
-    if (InjectLayer) {
-      const injectCtx = {
-        lastTask: saveResult.lastTask || "최근 작업",
-        summary: saveResult.summary || "",
-        recentConversations: [result.text.substring(0, 200) + "..."]
-      };
-
-      const injectResult = await InjectLayer(injectCtx);
-
-      if (injectResult.injectionPrompt) {
-        const promptBox = document.getElementById("promptBox");
-        const summaryArea = document.getElementById("summaryArea");
-        if (promptBox && summaryArea) {
-          promptBox.innerText = injectResult.injectionPrompt.length > 600 
-            ? injectResult.injectionPrompt.substring(0, 600) + "..." 
-            : injectResult.injectionPrompt;
-          summaryArea.style.display = "block";
-        }
-      }
-    }
-
-    incrementAndUpdateCount();
-
-  } catch (e) {
-    console.error(e);
-    btn.textContent = "❌ 실패";
-    alert("저장 실패: " + e.message);
-  } finally {
-    setTimeout(() => { 
-      btn.textContent = "📸 지금 저장"; 
-      btn.disabled = false; 
-    }, 1500);
-  }
-}
