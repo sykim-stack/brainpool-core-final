@@ -1,0 +1,212 @@
+// background.js — HajunCore 실제 연동 v1.0
+// 계약: throw 금지, _error 사용, req.text()+JSON.parse()
+
+console.log("[HajunAI Background] v1.0 실제 연동 시작");
+
+// ==================== 공통 유틸 ====================
+async function getCredentials() {
+  return new Promise(resolve => {
+    chrome.storage.local.get(['supabaseUrl', 'supabaseKey', 'geminiApiKey'], resolve);
+  });
+}
+
+async function supabaseFetch(url, key, path, options = {}) {
+  const res = await fetch(`${url}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  const text = await res.text();
+  console.log('[supabaseFetch] status:', res.status, 'body:', text.substring(0, 300)); // ← 추가
+  try { return JSON.parse(text); } catch(e) { return null; }
+}
+
+// ==================== Gemini 요약 ====================
+async function summarizeWithGemini(text, apiKey) {
+  try {
+    const prompt = `개발자 대화를 분석하여 JSON만 반환하세요. 마크다운 금지.
+필드: last_task(80자 이내), summary(100자 이내 한 줄), next_action(구체적 다음 행동)
+
+대화:
+${text.substring(0, 3000)}`;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { 
+          temperature: 0.1, 
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingBudget: 0 }
+          }
+        })
+      }
+    );
+
+    console.log('[Gemini] HTTP status:', res.status); // ← 추가
+    const data = await res.json();
+    console.log('[Gemini] 전체 응답:', JSON.stringify(data).substring(0, 500)); // ← 추가
+
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return { _error: 'JSON 파싱 실패' };
+    return JSON.parse(match[0]);
+  } catch(e) {
+    console.log('[Gemini] catch 에러:', e.message); // ← 추가
+    return { _error: e.message };
+  }
+}
+
+// ==================== 프롬프트 빌더 ====================
+function buildPrompt({ lastTask, summary, nextAction }) {
+  return `🦈 BRAINPOOL — 이어서 작업
+
+[마지막 작업]
+${lastTask || '없음'}
+
+[현재 상황 요약]
+${summary || '없음'}
+
+[지금 바로 할 것]
+${nextAction || '맥락 확인 후 이어서 진행'}
+
+---
+위 맥락을 기반으로 바로 이어서 작업해주세요.
+별도 설명 없이 [지금 바로 할 것]부터 시작하세요.`;
+}
+
+// ==================== 스냅샷 저장 ====================
+
+async function handleSnapshot(data) {
+  const traceId = 'tr-' + Date.now();
+  console.log(`[Snapshot] 시작 traceId: ${traceId}`);
+
+  const { supabaseUrl, supabaseKey, geminiApiKey } = await getCredentials();
+
+  console.log('[Snapshot] text 길이:', data?.text?.length || 0);      // ← 추가
+  console.log('[Snapshot] geminiKey 있음?', !!geminiApiKey);           // ← 추가
+  console.log('[Snapshot] supabaseUrl 있음?', !!supabaseUrl);          // ← 추가
+
+  if (!supabaseUrl || !supabaseKey) {
+    return { success: false, error: 'Supabase 설정 필요', traceId };
+  }
+
+  const text = data?.text || '';
+  if (!text) {
+    return { success: false, error: '대화 내용 없음', traceId };
+  }
+
+  // 1. Gemini 요약
+  let lastTask = '작업 진행 중';
+  let summary = '요약 없음';
+  let nextAction = '';
+
+  if (geminiApiKey) {
+    const geminiResult = await summarizeWithGemini(text, geminiApiKey);
+    if (!geminiResult._error) {
+      lastTask = geminiResult.last_task || lastTask;
+      summary = geminiResult.summary || summary;
+      nextAction = geminiResult.next_action || nextAction;
+    } else {
+      console.warn('[Snapshot] Gemini 실패:', geminiResult._error);
+    }
+  }
+
+  // 2. Supabase contexts upsert
+  const contextPayload = {
+    project_id: 'aaaaaaaa-0000-0000-0000-000000000001',
+    last_task: lastTask,
+    summary: summary,
+    next_action: nextAction,
+    updated_at: new Date().toISOString()
+  };
+
+  const saved = await supabaseFetch(
+  supabaseUrl, supabaseKey,
+  'contexts?on_conflict=project_id',
+  {
+    method: 'POST',
+    headers: { 
+      'Prefer': 'resolution=merge-duplicates,return=representation',
+      'Content-Profile': 'public',
+      'Accept-Profile': 'public'
+    },
+    body: JSON.stringify(contextPayload)
+  }
+);
+    console.log('[Snapshot] Supabase 저장 결과:', JSON.stringify(saved)); // ← 추가
+  if (!saved) {
+    console.warn('[Snapshot] Supabase 저장 실패');
+  }
+
+  // 3. 프롬프트 생성
+  const prompt = buildPrompt({ lastTask, summary, nextAction });
+
+  console.log(`[Snapshot] ✅ 완료 traceId: ${traceId}`);
+  return { success: true, summary, prompt, lastTask, nextAction, traceId };
+}
+
+// ==================== 최신 컨텍스트 로드 ====================
+async function getLatestContext() {
+  const { supabaseUrl, supabaseKey } = await getCredentials();
+  if (!supabaseUrl || !supabaseKey) return { _error: '설정 필요' };
+
+  const data = await supabaseFetch(
+    supabaseUrl, supabaseKey,
+    'contexts?order=updated_at.desc&limit=1'
+  );
+
+  const ctx = data?.[0];
+  if (!ctx) return { _error: '저장된 컨텍스트 없음' };
+
+  return {
+    success: true,
+    context: ctx,
+    prompt: buildPrompt({
+      lastTask: ctx.last_task,
+      summary: ctx.summary,
+      nextAction: ctx.next_action
+    })
+  };
+}
+
+// ==================== 메시지 핸들러 ====================
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  console.log(`[Background] 메시지: ${msg.type}`);
+
+  if (msg.type === 'MANUAL_SNAPSHOT') {
+    handleSnapshot(msg.data)
+      .then(sendResponse)
+      .catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
+  if (msg.type === 'INJECT_CONTENT_SCRIPT') {
+    chrome.scripting.executeScript({
+      target: { tabId: msg.tabId },
+      files: ['content.js']
+    }).then(() => sendResponse({ success: true }))
+      .catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
+  if (msg.type === 'GET_LATEST_CONTEXT') {
+    getLatestContext()
+      .then(sendResponse)
+      .catch(e => sendResponse({ _error: e.message }));
+    return true;
+  }
+
+  sendResponse({ error: 'Unknown type' });
+  return false;
+});
+
+console.log("[Background] ✅ v1.0 로드 완료");
