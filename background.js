@@ -21,7 +21,6 @@ async function supabaseFetch(url, key, path, options = {}) {
     }
   });
   const text = await res.text();
-  console.log('[supabaseFetch] status:', res.status, 'body:', text.substring(0, 300)); // ← 추가
   try { return JSON.parse(text); } catch(e) { return null; }
 }
 
@@ -42,17 +41,16 @@ ${text.substring(0, 3000)}`;
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { 
-          temperature: 0.1, 
-          maxOutputTokens: 2048,
-          thinkingConfig: { thinkingBudget: 0 }
+            temperature: 0.1, 
+            maxOutputTokens: 2048,
+            thinkingConfig: { thinkingBudget: 0 }
           }
         })
       }
     );
 
-    console.log('[Gemini] HTTP status:', res.status); // ← 추가
     const data = await res.json();
-    console.log('[Gemini] 전체 응답:', JSON.stringify(data).substring(0, 500)); // ← 추가
+    if (data.error) return { _error: data.error.message };
 
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const cleaned = raw.replace(/```json|```/g, '').trim();
@@ -60,7 +58,6 @@ ${text.substring(0, 3000)}`;
     if (!match) return { _error: 'JSON 파싱 실패' };
     return JSON.parse(match[0]);
   } catch(e) {
-    console.log('[Gemini] catch 에러:', e.message); // ← 추가
     return { _error: e.message };
   }
 }
@@ -87,13 +84,8 @@ ${nextAction || '맥락 확인 후 이어서 진행'}
 
 async function handleSnapshot(data) {
   const traceId = 'tr-' + Date.now();
-  console.log(`[Snapshot] 시작 traceId: ${traceId}`);
 
   const { supabaseUrl, supabaseKey, geminiApiKey } = await getCredentials();
-
-  console.log('[Snapshot] text 길이:', data?.text?.length || 0);      // ← 추가
-  console.log('[Snapshot] geminiKey 있음?', !!geminiApiKey);           // ← 추가
-  console.log('[Snapshot] supabaseUrl 있음?', !!supabaseUrl);          // ← 추가
 
   if (!supabaseUrl || !supabaseKey) {
     return { success: false, error: 'Supabase 설정 필요', traceId };
@@ -130,19 +122,19 @@ async function handleSnapshot(data) {
   };
 
   const saved = await supabaseFetch(
-  supabaseUrl, supabaseKey,
-  'contexts?on_conflict=project_id',
-  {
-    method: 'POST',
-    headers: { 
-      'Prefer': 'resolution=merge-duplicates,return=representation',
-      'Content-Profile': 'public',
-      'Accept-Profile': 'public'
-    },
-    body: JSON.stringify(contextPayload)
-  }
-);
-    console.log('[Snapshot] Supabase 저장 결과:', JSON.stringify(saved)); // ← 추가
+    supabaseUrl, supabaseKey,
+    'contexts?on_conflict=project_id',
+    {
+      method: 'POST',
+      headers: { 
+        'Prefer': 'resolution=merge-duplicates,return=representation',
+        'Content-Profile': 'public',
+        'Accept-Profile': 'public'
+      },
+      body: JSON.stringify(contextPayload)
+    }
+  );
+
   if (!saved) {
     console.warn('[Snapshot] Supabase 저장 실패');
   }
