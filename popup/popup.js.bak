@@ -1,0 +1,350 @@
+﻿// Core Extension v1.0 ??BRAINPOOL popup.js
+// 湲곕뒫: AI ??媛먯? + ?ㅻ깄?????+ Action Engine ?쒖떆 + ?곹깭 ?뺤씤 + ?ㅼ젙 + ?댁뼱媛湲??꾨＼?꾪듃
+
+// ========== 1. 怨듯넻 ?좏떥由ы떚 ==========
+function getSupabaseCredentials() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['supabaseUrl', 'supabaseKey'], (result) => resolve(result));
+  });
+}
+
+// ========== 2. ?곹깭 泥댄겕 (Supabase ?곌껐 ?뺤씤) ==========
+async function runHealthCheck() {
+  const resultsContainer = document.getElementById('healthResults');
+  const lastCheckEl = document.getElementById('lastCheckTime');
+  if (!resultsContainer) return;
+
+  resultsContainer.innerHTML = '<div class="loading-state">?㈉ Supabase ?곌껐 ?뺤씤 以?..</div>';
+
+  try {
+    const { supabaseUrl, supabaseKey } = await getSupabaseCredentials();
+    if (!supabaseUrl || !supabaseKey) {
+      resultsContainer.innerHTML = `<div class="empty">?좑툘 ?ㅼ젙 ??뿉??Supabase URL怨?Key瑜?癒쇱? ?곌껐?댁＜?몄슂.</div>`;
+      if (lastCheckEl) lastCheckEl.textContent = '?ㅼ젙 ?꾩슂';
+      return;
+    }
+
+    const response = await fetch(`${supabaseUrl}/rest/v1/hajunai_conversations?select=count&limit=1`, {
+      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+    });
+    const text = await response.text();
+    let ok = false;
+    try {
+      const data = JSON.parse(text);
+      ok = !data.error;
+    } catch(e) { ok = false; }
+
+    if (ok) {
+      resultsContainer.innerHTML = `<div class="record-card" style="border-left:4px solid #3FB950"><span class="record-project">?윟 Supabase ?곌껐 ?뺤긽</span></div>`;
+    } else {
+      resultsContainer.innerHTML = `<div class="record-card" style="border-left:4px solid #F78166"><span class="record-project">?뵶 Supabase ?곌껐 ?ㅽ뙣</span></div>`;
+    }
+    if (lastCheckEl) lastCheckEl.textContent = new Date().toLocaleTimeString();
+  } catch (e) {
+    resultsContainer.innerHTML = `<div class="empty">?좑툘 ?곌껐 ?ㅻ쪟: ${e.message}</div>`;
+  }
+}
+
+// ========== 3. ?ㅼ젙 ???==========
+function initSettings() {
+  document.getElementById('btnSaveSettings')?.addEventListener('click', () => {
+    const url = document.getElementById('settingUrl')?.value || '';
+    const key = document.getElementById('settingKey')?.value || '';
+    const notionKey = document.getElementById('settingNotionKey')?.value || '';
+    const notionDbId = document.getElementById('settingNotionDbId')?.value || '';
+    const geminiKey = document.getElementById('settingGeminiKey')?.value || '';
+    chrome.storage.local.set(
+      { supabaseUrl: url, supabaseKey: key, notionApiKey: notionKey, notionDbId: notionDbId, geminiApiKey: geminiKey },
+      () => alert('???ㅼ젙 ????꾨즺')
+    );
+  });
+  chrome.storage.local.get(['supabaseUrl', 'supabaseKey', 'notionApiKey', 'notionDbId', 'geminiApiKey'], (result) => {
+    if (document.getElementById('settingUrl')) document.getElementById('settingUrl').value = result.supabaseUrl || '';
+    if (document.getElementById('settingKey')) document.getElementById('settingKey').value = result.supabaseKey || '';
+    if (document.getElementById('settingNotionKey')) document.getElementById('settingNotionKey').value = result.notionApiKey || '';
+    if (document.getElementById('settingNotionDbId')) document.getElementById('settingNotionDbId').value = result.notionDbId || '';
+    if (document.getElementById('settingGeminiKey')) document.getElementById('settingGeminiKey').value = result.geminiApiKey || '';
+  });
+}
+
+// ========== 4. Action Engine ?곗씠??濡쒕뱶 ==========
+async function loadActionTabData() {
+  try {
+    const { supabaseUrl, supabaseKey } = await getSupabaseCredentials();
+    if (!supabaseUrl || !supabaseKey) return;
+
+    const res = await fetch(`${supabaseUrl}/rest/v1/contexts?select=next_action,action_reasoning,summary,current_problems,health_score&order=updated_at.desc&limit=1`, {
+      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+    });
+    if (!res.ok) return;
+
+    const text = await res.text();
+    let contexts = [];
+    try { contexts = JSON.parse(text); } catch(e) { return; }
+    if (contexts.length === 0) return;
+
+    const ctx = contexts[0];
+    const actionContainer = document.getElementById('actionEngineContainer');
+    if (!actionContainer) return;
+
+    if (ctx.next_action && ctx.next_action !== 'null' && ctx.next_action !== '') {
+      actionContainer.innerHTML = `
+        <div class="record-card" style="border-left: 4px solid var(--accent2); margin-top: 8px;">
+          <div class="record-top"><span class="record-project">?렞 異붿쿇 ?ㅼ쓬 ?됰룞</span></div>
+          <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">${escapeHtml(ctx.next_action)}</div>
+          <div style="font-size: 11px; color: var(--text2); margin-bottom: 4px;">?뱦 ?꾩옱 ?곹깭: ${escapeHtml(ctx.summary || '遺꾩꽍 以?)}</div>
+          ${ctx.current_problems && ctx.current_problems !== '?놁쓬' ? `<div style="font-size: 11px; color: var(--warn);">?좑툘 臾몄젣: ${escapeHtml(ctx.current_problems)}</div>` : ''}
+          ${ctx.action_reasoning && ctx.action_reasoning !== '?놁쓬' ? `<div style="font-size: 11px; color: var(--text2);">?뮕 ${escapeHtml(ctx.action_reasoning)}</div>` : ''}
+          <div style="font-size: 10px; color: var(--accent); margin-top: 6px;">?룯 嫄닿컯 ?먯닔: ${ctx.health_score || 'N/A'}/100</div>
+        </div>
+      `;
+    } else {
+      actionContainer.innerHTML = `
+        <div class="record-card" style="border-left: 4px solid var(--text3); margin-top: 8px;">
+          <div class="record-top"><span class="record-project">??Action Engine ?湲?以?/span></div>
+          <div style="font-size: 12px; color: var(--text2);">??붾? ??ν븯硫??ㅼ쓬 ?됰룞??異붿쿇?⑸땲??</div>
+        </div>
+      `;
+    }
+  } catch(e) { console.warn('Action ?곗씠??濡쒕뱶 ?ㅽ뙣:', e); }
+}
+
+// ========== 5. AI ???ㅼ틪 諛????==========
+let currentTabs = [];
+
+async function scanAITabs() {
+  const listEl = document.getElementById('aiList');
+  const saveBtn = document.getElementById('btnSaveNow');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="loading-state">?뵇 AI ???ㅼ틪 以?..</div>';
+  try {
+    const allTabs = await chrome.tabs.query({});
+    const aiSites = ['claude.ai', 'chatgpt.com', 'gemini.google.com', 'perplexity.ai'];
+    const aiTabs = allTabs.filter(tab => tab.url && aiSites.some(site => tab.url.includes(site)));
+    currentTabs = aiTabs;
+    if (aiTabs.length === 0) {
+      listEl.innerHTML = `<div class="ai-item"><span class="ai-name">媛먯???AI ?놁쓬</span><span class="ai-status">?湲?/span></div>
+        <div style="font-size:11px; margin-top:8px;">?뮕 Claude/ChatGPT/Gemini/Perplexity ??쓣 ?닿퀬 ?덈줈怨좎묠?섏꽭??/div>`;
+      if (saveBtn) saveBtn.disabled = true;
+      return;
+    }
+    listEl.innerHTML = aiTabs.map(tab => `
+      <div class="ai-item" data-tab-id="${tab.id}">
+        <span class="ai-name">${getAIName(tab.url)}</span>
+        <span class="ai-status active">???곌껐??/span>
+      </div>
+    `).join('');
+    if (saveBtn) saveBtn.disabled = false;
+  } catch(e) {
+    listEl.innerHTML = `<div class="empty">?????묎렐 ?ㅽ뙣: ${e.message}</div>`;
+    if (saveBtn) saveBtn.disabled = true;
+  }
+}
+
+function getAIName(url) {
+  if (!url) return 'AI';
+  if (url.includes('claude.ai')) return 'Claude';
+  if (url.includes('chatgpt.com')) return 'ChatGPT';
+  if (url.includes('gemini.google.com')) return 'Gemini';
+  if (url.includes('perplexity.ai')) return 'Perplexity';
+  return 'AI';
+}
+
+async function saveCurrentConversation() {
+  const btn = document.getElementById('btnSaveNow');
+  if (!btn) return;
+  if (currentTabs.length === 0) {
+    alert('??ν븷 AI ??씠 ?놁뒿?덈떎.\nAI ??쓣 ?댁뼱二쇱꽭??');
+    return;
+  }
+  const tab = currentTabs[0];
+  btn.disabled = true;
+  btn.textContent = '?????以?..';
+  try {
+    let result;
+    try {
+      const ping = await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
+      if (ping === 'pong') result = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONVERSATION' });
+      else throw new Error('Ping failed');
+    } catch(e) {
+      const injectResult = await sendMessageToBg({ type: 'INJECT_CONTENT_SCRIPT', tabId: tab.id });
+      if (!injectResult?.success) throw new Error('content.js 二쇱엯 ?ㅽ뙣: ' + (injectResult?.error || ''));
+      await new Promise(r => setTimeout(r, 500));
+      result = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONVERSATION' });
+    }
+    if (result?.error) throw new Error(result.error);
+    if (!result?.text) throw new Error('????댁슜 ?놁쓬');
+    const saveResult = await sendMessageToBg({
+      type: 'MANUAL_SNAPSHOT',
+      data: { text: result.text, title: result.title || getAIName(tab.url), url: result.url, ai: result.ai }
+    });
+    if (saveResult?.error) throw new Error(saveResult.error);
+    btn.textContent = '??????꾨즺!';
+    if (saveResult.summary) showSummaryPopup(saveResult.summary);
+    incrementAndUpdateCount();
+    setTimeout(() => { btn.textContent = '?벝 吏湲????; btn.disabled = false; }, 2000);
+  } catch(e) {
+    btn.textContent = '???ㅽ뙣';
+    alert('????ㅽ뙣: ' + e.message);
+    setTimeout(() => { btn.textContent = '?벝 吏湲????; btn.disabled = false; }, 3000);
+  }
+}
+
+function updateSnapshotCountDisplay() {
+  chrome.storage.local.get(['todaySnapshotCount'], (result) => {
+    const count = result.todaySnapshotCount || 0;
+    const countEl = document.getElementById('snapshotCount');
+    if (countEl) countEl.textContent = count;
+  });
+}
+
+function incrementAndUpdateCount() {
+  chrome.storage.local.get(['todaySnapshotCount'], (result) => {
+    const count = (result.todaySnapshotCount || 0) + 1;
+    chrome.storage.local.set({ todaySnapshotCount: count });
+    const countEl = document.getElementById('snapshotCount');
+    if (countEl) countEl.textContent = count;
+  });
+}
+
+function initSnapshotEvents() {
+  const saveBtn = document.getElementById('btnSaveNow');
+  if (saveBtn) {
+    const newBtn = saveBtn.cloneNode(true);
+    saveBtn.parentNode.replaceChild(newBtn, saveBtn);
+    newBtn.addEventListener('click', saveCurrentConversation);
+  }
+  const manualBtn = document.getElementById('btnManualSave');
+  if (manualBtn) {
+    const newBtn = manualBtn.cloneNode(true);
+    manualBtn.parentNode.replaceChild(newBtn, manualBtn);
+    newBtn.addEventListener('click', async () => {
+      const text = document.getElementById('manualText')?.value.trim();
+      if (!text) { alert('?댁슜 ?낅젰'); return; }
+      const btn = newBtn;
+      btn.disabled = true;
+      btn.textContent = '?????..';
+      const result = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          type: 'MANUAL_SNAPSHOT',
+          data: { text, title: document.getElementById('manualTitle')?.value || '?섎룞 ?낅젰' }
+        }, (response) => {
+          if (chrome.runtime.lastError) resolve({ error: chrome.runtime.lastError.message });
+          else resolve(response || {});
+        });
+      });
+      if (result?.error) alert(`?ㅽ뙣: ${result.error}`);
+      else {
+        alert('??????꾨즺');
+        document.getElementById('manualText').value = '';
+        incrementAndUpdateCount();
+        if (result.summary) showSummaryPopup(result.summary);
+      }
+      btn.disabled = false;
+      btn.textContent = '?뮶 ?섎룞 ???;
+    });
+  }
+  const toggleBtn = document.getElementById('btnToggleManual');
+  if (toggleBtn) {
+    const newBtn = toggleBtn.cloneNode(true);
+    toggleBtn.parentNode.replaceChild(newBtn, toggleBtn);
+    newBtn.addEventListener('click', () => {
+      const manualDiv = document.getElementById('manualInput');
+      if (manualDiv) manualDiv.classList.toggle('active');
+    });
+  }
+}
+
+// ========== 6. ???꾪솚 ==========
+function initTabs() {
+  const tabs = document.querySelectorAll('.tab');
+  const contents = document.querySelectorAll('.content');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabId = tab.getAttribute('data-tab');
+      tabs.forEach(t => t.classList.remove('active'));
+      contents.forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      const target = document.getElementById(`tab-${tabId}`);
+      if (target) target.classList.add('active');
+      if (tabId === 'status') runHealthCheck();
+      if (tabId === 'action') {
+        loadActionTabData();
+        scanAITabs();
+        updateSnapshotCountDisplay();
+      }
+    });
+  });
+}
+
+// ========== 7. 硫붿떆吏 ?꾩넚 ==========
+function sendMessageToBg(msg) {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve({ error: 'timeout' }), 10000);
+    chrome.runtime.sendMessage(msg, (response) => {
+      clearTimeout(timeout);
+      if (chrome.runtime.lastError) resolve({ error: chrome.runtime.lastError.message });
+      else resolve(response || {});
+    });
+  });
+}
+
+// ========== 8. ?붿빟 ?앹뾽 ==========
+function showSummaryPopup(summary) {
+  const existingDiv = document.getElementById('summaryDisplay');
+  if (existingDiv) existingDiv.remove();
+  const summaryDiv = document.createElement('div');
+  summaryDiv.id = 'summaryDisplay';
+  summaryDiv.style.cssText = `margin-top:12px; padding:12px; background:var(--bg2); border-radius:var(--radius); border-left:3px solid var(--accent2); font-size:12px;`;
+  summaryDiv.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-weight:700; color:var(--accent2);">??Gemini ?붿빟</span>
+      <button id="closeSummaryBtn" style="background:none; border:none; color:var(--text3); cursor:pointer;">??/button>
+    </div>
+    <div style="color:var(--text); line-height:1.5;">${escapeHtml(summary)}</div>
+  `;
+  const saveBtn = document.getElementById('btnSaveNow');
+  if (saveBtn && saveBtn.parentNode) saveBtn.insertAdjacentElement('afterend', summaryDiv);
+  else document.getElementById('tab-action')?.appendChild(summaryDiv);
+  document.getElementById('closeSummaryBtn')?.addEventListener('click', () => summaryDiv.remove());
+  setTimeout(() => { if (summaryDiv.parentNode) summaryDiv.remove(); }, 10000);
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ========== 9. ?댁뼱媛湲??꾨＼?꾪듃 ?앹꽦 (理쒖쥌: ?ㅽ뻾 而⑦뀓?ㅽ듃 以묒떖) ==========
+
+
+// ========== 10. 珥덇린??==========
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs();
+  initSettings();
+  initSnapshotEvents();
+
+  document.getElementById('btnRefreshHealth')?.addEventListener('click', runHealthCheck);
+  
+  // "?댁뼱???쒖옉" 踰꾪듉 ?대깽??(踰꾪듉??議댁옱??寃쎌슦?먮쭔)
+  const continueBtn = document.getElementById('btnContinueContext');
+  if (continueBtn) {
+    continueBtn.addEventListener('click', generateContinuePrompt);
+  }
+
+  // 珥덇린 ?곹깭 ?뺤씤
+  runHealthCheck();
+  scanAITabs();
+  updateSnapshotCountDisplay();
+
+  // ?좎쭨 蹂寃???移댁슫??由ъ뀑
+  chrome.storage.local.get(['lastResetDate'], (result) => {
+    const today = new Date().toDateString();
+    if (result.lastResetDate !== today) {
+      chrome.storage.local.set({ todaySnapshotCount: 0, lastResetDate: today });
+      updateSnapshotCountDisplay();
+    }
+  });
+});

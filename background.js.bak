@@ -1,0 +1,45 @@
+﻿console.log("[HajunAI Background] HajunCore 연동 v0.3 - Content Script 안정화");
+
+let HajunCore = null;
+let InjectLayer = null;
+let SnapshotLayer = null;
+
+// Stub (임시)
+HajunCore = (ctx = {}) => ({ traceId: "tr-" + Date.now(), projectId: ctx.projectId || "aaaaaaaa-0000-0000-0000-000000000001", _error: null, ...ctx });
+InjectLayer = (ctx = {}) => { ctx = HajunCore(ctx); ctx.injectionPrompt = "🦈 맥락 주입 준비 완료 (Stub)"; return ctx; };
+SnapshotLayer = async (ctx = {}) => { ctx = HajunCore(ctx); return ctx; };
+
+console.log("[Background] ✅ HajunCore Stub 로드 완료");
+
+// ==================== 메시지 핸들러 ====================
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  console.log(`[Background] 메시지: ${msg.type}`);
+
+  if (msg.type === 'MANUAL_SNAPSHOT') {
+    handleManualSnapshot(msg.data).then(sendResponse).catch(e => sendResponse({error: e.message}));
+    return true;
+  }
+
+  if (msg.type === 'INJECT_CONTENT_SCRIPT') {
+    chrome.scripting.executeScript({
+      target: { tabId: msg.tabId },
+      files: ['content.js']
+    }).then(() => {
+      sendResponse({ success: true });
+    }).catch(err => {
+      console.error("Content script injection failed:", err);
+      sendResponse({ success: false, error: err.message });
+    });
+    return true;
+  }
+
+  sendResponse({ error: 'Unknown type' });
+  return false;
+});
+
+async function handleManualSnapshot(data) {
+  console.log("[Snapshot] 데이터 수신:", data?.title);
+  let ctx = { rawConversation: data };
+  ctx = await SnapshotLayer(ctx);
+  return { success: !ctx._error, error: ctx._error, summary: "테스트 요약" };
+}

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>BRAINPOOL Core-F</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg:#0D1117; --bg2:#161B22; --bg3:#21262D; --border:#30363D;
+    --accent:#58A6FF; --accent2:#3FB950; --warn:#F78166;
+    --text:#E6EDF3; --text2:#8B949E; --text3:#484F58; --radius:8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body { 
+    width: 560px; min-height: 600px; background: var(--bg); 
+    color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px;
+    overflow-y: auto; overflow-x: hidden;
+  }
+
+  .header { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .header-left { display:flex; align-items:center; gap:8px; }
+  .logo { width:28px; height:28px; background:linear-gradient(135deg,#58A6FF,#3FB950); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; color:#0D1117; }
+  .header-title { font-weight:700; font-size:14px; }
+  .header-sub { font-size:10px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:var(--accent2); box-shadow:0 0 6px var(--accent2); }
+  .status-dot.offline { background:var(--warn); box-shadow:0 0 6px var(--warn); }
+
+  .tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); padding:0 4px; overflow-x:auto; }
+  .tab { padding:8px 12px; font-size:12px; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; flex-shrink:0; }
+  .tab:hover { color:var(--text); }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .content { padding:14px 16px; display:none; }
+  .content.active { display:block; }
+
+  .section-label { font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; font-family:'JetBrains Mono',monospace; }
+  .btn { width:100%; padding:10px; border-radius:var(--radius); border:none; font-family:'Noto Sans KR',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .btn-primary { background:var(--accent); color:#0D1117; }
+  .btn-primary:hover { background:#79B8FF; }
+  .btn-sm { background:var(--bg2); border:1px solid var(--border); color:var(--text2); padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+  .btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-secondary { background:var(--bg2); border:1px solid var(--border); color:var(--text2); margin-top:8px; font-size:12px; padding:8px; }
+  .btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+
+  .record-card { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:10px; margin-bottom:8px; }
+  .record-top { display:flex; justify-content:space-between; margin-bottom:4px; }
+  .record-project { font-weight:700; font-size:11px; }
+  .record-time { font-size:10px; color:var(--text3); }
+  .empty, .loading-state { text-align:center; color:var(--text3); padding:20px; font-size:12px; }
+  .gap { margin-bottom:12px; }
+  .gap-sm { margin-bottom:8px; }
+
+  input, textarea { width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:10px 12px; font-size:14px; outline:none; }
+  input:focus, textarea:focus { border-color:var(--accent); }
+
+  .ai-list { display:flex; flex-direction:column; gap:6px; }
+  .ai-item { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:var(--bg2); border-radius:6px; border:1px solid var(--border); }
+  .ai-name { font-weight:500; font-size:12px; }
+  .ai-status { font-size:10px; padding:2px 8px; border-radius:4px; background:var(--bg3); color:var(--text2); }
+  .ai-status.active { background:#238636; color:#fff; }
+
+  .snapshot-count { font-size:24px; font-weight:700; color:var(--accent); font-family:'JetBrains Mono',monospace; margin-bottom:4px; }
+  .snapshot-label { font-size:11px; color:var(--text2); margin-bottom:12px; }
+
+  #manualInput { display:none; margin-top:8px; }
+  #manualInput.active { display:block; }
+
+  /* 추가: 요약 및 프롬프트 박스 스타일 */
+  .summary-card {
+    background: var(--bg3);
+    border-left: 4px solid var(--accent2);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-top: 16px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .prompt-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+  }
+  .copy-btn {
+    margin-top: 8px;
+    width: auto;
+    padding: 6px 12px;
+    background: var(--bg2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .copy-btn:hover {
+    background: var(--accent);
+    color: #0D1117;
+  }
+
+  .footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; margin-top:auto; }
+  .footer-text { font-size:10px; color:var(--text3); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">BP</div>
+    <div><div class="header-title">BRAINPOOL Core</div><div class="header-sub">기억보다 행동</div></div>
+  </div>
+  <div class="status-dot" id="statusDot"></div>
+</div>
+
+<!-- 코어 탭: 상태 / 행동 / 설정 -->
+<div class="tabs">
+  <div class="tab active" data-tab="status">💚 상태</div>
+  <div class="tab" data-tab="action">📋 행동</div>
+  <div class="tab" data-tab="settings">⚙️ 설정</div>
+</div>
+
+<!-- 💚 상태 탭 (간단 헬스체크) -->
+<div class="content active" id="tab-status">
+  <div class="gap">
+    <div class="section-label">🩺 시스템 상태</div>
+    <button class="btn-sm" id="btnRefreshHealth">🔄 새로고침</button>
+  </div>
+  <div id="healthResults"><div class="empty">상태를 확인하려면 새로고침하세요</div></div>
+  <div class="gap-sm" style="margin-top:8px; color:var(--text3); font-size:10px;">마지막 확인: <span id="lastCheckTime">-</span></div>
+</div>
+
+<!-- 📋 행동 탭 (스냅샷 + Action Engine) -->
+<div class="content" id="tab-action">
+  <div class="gap">
+    <div class="section-label">📸 AI 대화 스냅샷</div>
+    <div class="ai-list" id="aiList">
+      <div class="loading-state">탭을 스캔하는 중...</div>
+    </div>
+    <div class="snapshot-count" id="snapshotCount">-</div>
+    <div class="snapshot-label">오늘 저장된 대화</div>
+    <button class="btn btn-primary" id="btnSaveNow" disabled>📸 지금 저장</button>
+    <button class="btn btn-secondary" id="btnToggleManual">✏️ 수동 입력</button>
+    <div id="manualInput">
+      <textarea id="manualText" rows="4" placeholder="AI 대화 내용을 여기에 붙여넣으세요..."></textarea>
+      <input type="text" id="manualTitle" placeholder="제목 (선택)">
+      <button class="btn btn-primary" id="btnManualSave">💾 수동 저장</button>
+    </div>
+  </div>
+
+  <div class="gap" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+    <div class="section-label">🎯 Action Engine (다음 행동)</div>
+    <div id="actionEngineContainer">
+      <div class="record-card" style="border-left: 4px solid var(--text3);">
+        <div style="font-size: 12px; color: var(--text2);">대화를 저장하면 다음 행동이 추천됩니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gap" style="margin-top: 12px;">
+    <button class="btn btn-primary" id="btnContinueContext" style="background: var(--accent2);">📋 이어서 시작 (프롬프트 복사)</button>
+    <div style="font-size: 10px; color: var(--text3); margin-top: 6px;">클릭하면 현재 맥락을 프롬프트로 복사합니다. Claude/ChatGPT에 붙여넣으세요.</div>
+  </div>
+
+  <!-- 🔽 추가된 요약 및 프롬프트 표시 영역 (저장 후 나타남) -->
+  <div id="summaryArea" style="display: none; margin-top: 20px;">
+    <div class="summary-card">
+      <div style="font-weight: 700; margin-bottom: 8px; color: var(--accent2);">✨ Gemini 요약</div>
+      <div id="summaryText" style="white-space: pre-wrap; word-break: break-word;"></div>
+    </div>
+    <div style="margin-top: 12px;">
+      <div class="section-label">📋 생성된 이어가기 프롬프트</div>
+      <div id="promptBox" class="prompt-box"></div>
+      <button id="btnCopyPrompt" class="copy-btn">📋 프롬프트 복사하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⚙️ 설정 탭 (Supabase + 선택적 키) -->
+<div class="content" id="tab-settings">
+  <div class="section-label" style="margin-bottom:10px;">필수 연결</div>
+  <div class="gap">
+    <div class="section-label">Supabase URL</div>
+    <input type="text" id="settingUrl" placeholder="https://xxxx.supabase.co">
+  </div>
+  <div class="gap">
+    <div class="section-label">Supabase Anon Key</div>
+    <input type="password" id="settingKey">
+  </div>
+  <div class="gap" style="margin-top:16px;">
+    <div class="section-label">선택사항 (요약 품질 향상)</div>
+    <div class="section-label">Gemini API Key</div>
+    <input type="password" id="settingGeminiKey" placeholder="AIzaSy... (선택)">
+  </div>
+  <div class="gap">
+    <div class="section-label">선택사항 (Notion 연동)</div>
+    <div class="section-label">Notion API Key</div>
+    <input type="password" id="settingNotionKey" placeholder="secret_... (선택)">
+    <div class="section-label" style="margin-top:6px;">Notion Database ID</div>
+    <input type="text" id="settingNotionDbId" placeholder="데이터베이스 ID (선택)">
+  </div>
+  <button class="btn btn-primary" id="btnSaveSettings">💾 설정 저장</button>
+  <div style="margin-top:12px; font-size:10px; color:var(--text3);">Core Extension v1.0</div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
