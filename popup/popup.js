@@ -409,3 +409,45 @@ async function autoLoadContext() {
   });
   autoLoadContext(); // ← 이 줄 추가
 });
+
+
+// ========== 자동 컨텍스트 로드 (팝업 열릴 때) ==========
+async function autoLoadContext() {
+  try {
+    const result = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'GET_LATEST_CONTEXT' }, (response) => {
+        if (chrome.runtime.lastError) resolve({ _error: chrome.runtime.lastError.message });
+        else resolve(response || {});
+      });
+    });
+
+    if (result._error || !result.success) {
+      console.log('[popup] 자동 로드 실패:', result._error);
+      return;
+    }
+
+    const summaryArea = document.getElementById('summaryArea');
+    const summaryText = document.getElementById('summaryText');
+    const promptBox = document.getElementById('promptBox');
+
+    if (summaryArea && summaryText && promptBox) {
+      summaryText.innerText = result.context.summary || '저장된 요약 없음';
+      promptBox.innerText = result.prompt;
+      summaryArea.style.display = 'block';
+
+      const copyBtn = document.getElementById('btnCopyPrompt');
+      if (copyBtn) {
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(promptBox.innerText);
+          alert('✅ 프롬프트 복사됨');
+        };
+      }
+    }
+
+    console.log('[popup] ✅ 자동 컨텍스트 로드 완료');
+  } catch(e) {
+    console.warn('[popup] 자동 로드 에러:', e);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', autoLoadContext);

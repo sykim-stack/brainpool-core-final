@@ -1,9 +1,6 @@
-// background.js — HajunCore 실제 연동 v1.0
-// 계약: throw 금지, _error 사용, req.text()+JSON.parse()
+// background.js — HajunCore 실제 연동 v1.1 (정리됨)
+console.log("[HajunAI Background] v1.1 로드");
 
-console.log("[HajunAI Background] v1.0 실제 연동 시작");
-
-// ==================== 공통 유틸 ====================
 async function getCredentials() {
   return new Promise(resolve => {
     chrome.storage.local.get(['supabaseUrl', 'supabaseKey', 'geminiApiKey'], resolve);
@@ -24,7 +21,6 @@ async function supabaseFetch(url, key, path, options = {}) {
   try { return JSON.parse(text); } catch(e) { return null; }
 }
 
-// ==================== Gemini 요약 ====================
 async function summarizeWithGemini(text, apiKey) {
   try {
     const prompt = `개발자 대화를 분석하여 JSON만 반환하세요. 마크다운 금지.
@@ -40,8 +36,8 @@ ${text.substring(0, 3000)}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { 
-            temperature: 0.1, 
+          generationConfig: {
+            temperature: 0.1,
             maxOutputTokens: 2048,
             thinkingConfig: { thinkingBudget: 0 }
           }
@@ -62,7 +58,6 @@ ${text.substring(0, 3000)}`;
   }
 }
 
-// ==================== 프롬프트 빌더 ====================
 function buildPrompt({ lastTask, summary, nextAction }) {
   return `🦈 BRAINPOOL — 이어서 작업
 
@@ -80,8 +75,6 @@ ${nextAction || '맥락 확인 후 이어서 진행'}
 별도 설명 없이 [지금 바로 할 것]부터 시작하세요.`;
 }
 
-// ==================== 스냅샷 저장 ====================
-
 async function handleSnapshot(data) {
   const traceId = 'tr-' + Date.now();
 
@@ -96,7 +89,6 @@ async function handleSnapshot(data) {
     return { success: false, error: '대화 내용 없음', traceId };
   }
 
-  // 1. Gemini 요약
   let lastTask = '작업 진행 중';
   let summary = '요약 없음';
   let nextAction = '';
@@ -112,7 +104,6 @@ async function handleSnapshot(data) {
     }
   }
 
-  // 2. Supabase contexts upsert
   const contextPayload = {
     project_id: 'aaaaaaaa-0000-0000-0000-000000000001',
     last_task: lastTask,
@@ -126,7 +117,7 @@ async function handleSnapshot(data) {
     'contexts?on_conflict=project_id',
     {
       method: 'POST',
-      headers: { 
+      headers: {
         'Prefer': 'resolution=merge-duplicates,return=representation',
         'Content-Profile': 'public',
         'Accept-Profile': 'public'
@@ -139,21 +130,20 @@ async function handleSnapshot(data) {
     console.warn('[Snapshot] Supabase 저장 실패');
   }
 
-  // 3. 프롬프트 생성
   const prompt = buildPrompt({ lastTask, summary, nextAction });
 
   console.log(`[Snapshot] ✅ 완료 traceId: ${traceId}`);
   return { success: true, summary, prompt, lastTask, nextAction, traceId };
 }
 
-// ==================== 최신 컨텍스트 로드 ====================
 async function getLatestContext() {
   const { supabaseUrl, supabaseKey } = await getCredentials();
   if (!supabaseUrl || !supabaseKey) return { _error: '설정 필요' };
 
   const data = await supabaseFetch(
     supabaseUrl, supabaseKey,
-    'contexts?order=updated_at.desc&limit=1'
+    'contexts?order=updated_at.desc&limit=1',
+    { headers: { 'Accept-Profile': 'public' } }
   );
 
   const ctx = data?.[0];
@@ -170,10 +160,7 @@ async function getLatestContext() {
   };
 }
 
-// ==================== 메시지 핸들러 ====================
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  console.log(`[Background] 메시지: ${msg.type}`);
-
   if (msg.type === 'MANUAL_SNAPSHOT') {
     handleSnapshot(msg.data)
       .then(sendResponse)
@@ -201,4 +188,4 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
-console.log("[Background] ✅ v1.0 로드 완료");
+console.log("[Background] ✅ v1.1 로드 완료");
