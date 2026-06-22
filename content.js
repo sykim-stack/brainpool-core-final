@@ -8,17 +8,18 @@ const AI_SELECTORS = {
     assistantMessages: '[class*="font-claude-response-body"]'
   },
   'chatgpt.com': {
-    name: 'ChatGPT',
-    messages: '[data-message-id]',
-    roleAttr: 'data-author-role',
-    text: '[class*="prose"]'
-  },
-  'chat.openai.com': {
-    name: 'ChatGPT',
-    messages: '[data-message-id]',
-    roleAttr: 'data-author-role',
-    text: '[class*="prose"]'
-  },
+  name: 'ChatGPT',
+  messages: '[data-message-id]',
+  roleAttr: 'data-message-author-role',
+  text: '[class*="prose"]'
+}
+
+'chat.openai.com': {
+  name: 'ChatGPT',
+  messages: '[data-message-id]',
+  roleAttr: 'data-message-author-role',
+  text: '[class*="prose"]'
+}
   'gemini.google.com': {
     name: 'Gemini',
     userMessages: '.query-text, [class*="user-query"], .user-query-text',
@@ -102,6 +103,10 @@ return {
 
     messages.forEach(m => delete m._el);
   }
+
+console.log('messages=', messages.length);
+console.log('filtered=', filtered.length);
+console.log(messages);
 
   if (messages.length === 0) return { error: '메시지를 찾을 수 없음' };
 

@@ -1,4 +1,4 @@
-﻿// BRAINPOOL Core Extension — popup.js (HajunCore v0.9 완전 연결)
+// BRAINPOOL Core Extension — popup.js (HajunCore v0.9 완전 연결)
 
 let InjectLayer = null;
 let SupabaseClientFn = null;
@@ -148,6 +148,7 @@ function getAIName(url) {
   if (url.includes('gemini.google.com')) return 'Gemini';
   if (url.includes('perplexity.ai')) return 'Perplexity';
   return 'AI';
+  console.log(currentTabs);
 }
 
 // ========== 저장 (단일 버전, HajunCore 완전 연결) ==========
@@ -155,7 +156,7 @@ async function saveCurrentConversation() {
   const btn = document.getElementById('btnSaveNow');
   if (!btn) return;
   if (currentTabs.length === 0) { alert('저장할 AI 탭이 없습니다.'); return; }
-  const tab = currentTabs[0];
+  const tab = currentTabs.find(t => t.active) || currentTabs[0];
   btn.disabled = true;
   btn.textContent = '⏳ 저장 중...';
   try {

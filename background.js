@@ -1,5 +1,14 @@
-// background.js — HajunCore 실제 연동 v1.1 (정리됨)
-console.log("[HajunAI Background] v1.1 로드");
+// background.js — HajunCore 실제 연동 v1.2 (AI별 맥락 분리)
+console.log("[HajunAI Background] v1.2 로드");
+
+// AI별 project_id 분리 — 맥락 혼용 방지
+const AI_PROJECT_MAP = {
+  'Claude':     'aaaaaaaa-0000-0000-0000-000000000001',
+  'ChatGPT':    'aaaaaaaa-0000-0000-0000-000000000002',
+  'Gemini':     'aaaaaaaa-0000-0000-0000-000000000003',
+  'Perplexity': 'aaaaaaaa-0000-0000-0000-000000000004',
+};
+const DEFAULT_PROJECT_ID = 'aaaaaaaa-0000-0000-0000-000000000001';
 
 async function getCredentials() {
   return new Promise(resolve => {
@@ -75,7 +84,20 @@ ${nextAction || '맥락 확인 후 이어서 진행'}
 별도 설명 없이 [지금 바로 할 것]부터 시작하세요.`;
 }
 
+function detectAI(url) {
+  if (!url) return null;
+  if (url.includes('claude.ai')) return 'Claude';
+  if (url.includes('chatgpt.com')) return 'ChatGPT';
+  if (url.includes('gemini.google.com')) return 'Gemini';
+  if (url.includes('perplexity.ai')) return 'Perplexity';
+  return null;
+}
+
 async function handleSnapshot(data) {
+    console.log('===== SNAPSHOT =====');
+  console.log(data);
+  console.log('ai=', data.ai);
+  console.log('url=', data.url);
   const traceId = 'tr-' + Date.now();
 
   const { supabaseUrl, supabaseKey, geminiApiKey } = await getCredentials();
@@ -88,6 +110,11 @@ async function handleSnapshot(data) {
   if (!text) {
     return { success: false, error: '대화 내용 없음', traceId };
   }
+
+  // AI 소스 감지 → project_id 결정
+  const aiSource = data.ai || detectAI(data.url);
+  const projectId = AI_PROJECT_MAP[aiSource] || DEFAULT_PROJECT_ID;
+  console.log(`[Snapshot] AI: ${aiSource || 'unknown'} → project_id: ${projectId}`);
 
   let lastTask = '작업 진행 중';
   let summary = '요약 없음';
@@ -105,7 +132,7 @@ async function handleSnapshot(data) {
   }
 
   const contextPayload = {
-    project_id: 'aaaaaaaa-0000-0000-0000-000000000001',
+    project_id: projectId,
     last_task: lastTask,
     summary: summary,
     next_action: nextAction,
@@ -188,4 +215,4 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
-console.log("[Background] ✅ v1.1 로드 완료");
+console.log("[Background] ✅ v1.2 로드 완료");
