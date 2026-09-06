@@ -525,6 +525,12 @@ async function saveCurrentConversation() {
 
     if (result?.error) throw new Error(result.error);
     if (!result?.text) throw new Error("대화 내용 없음");
+    if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+      const warning = result.warnings.join('\n');
+      if (!confirm(`추출 경고가 있습니다:\n\n${warning}\n\n현재 추출된 ${result.messageCount || 0}개 메시지만 저장할까요?`)) {
+        throw new Error('추출 경고로 저장을 취소했습니다.');
+      }
+    }
 
     const space = getSelectedHajunSpace();
     if (!space.yard_key || !space.room_key) throw new Error('먼저 하준아이 마당과 방을 선택해주세요.');
@@ -551,7 +557,8 @@ async function saveCurrentConversation() {
       const injectCtx = {
         lastTask: saveResult.lastTask || "최근 작업",
         summary: saveResult.summary || "",
-        recentConversations: [result.text.substring(0, 200) + "..."]
+        // 원문 저장은 전체, 주입 엔진에 넘기는 보조 미리보기만 제한한다.
+        recentConversations: [result.text.substring(0, 1200) + (result.text.length > 1200 ? "..." : "")]
       };
 
       const injectResult = await InjectLayer(injectCtx);
