@@ -1,197 +1,28 @@
-// background.js — HajunCore 실제 연동 v1.2 (AI별 맥락 분리)
-console.log("[HajunAI Background] v1.2 로드");
+console.log("[HajunAI Background] HajunCore 연동 v0.3 - Content Script 안정화");
 
-// AI별 project_id 분리 — 맥락 혼용 방지
-const AI_PROJECT_MAP = {
-  'Claude':     'aaaaaaaa-0000-0000-0000-000000000001',
-  'ChatGPT':    'aaaaaaaa-0000-0000-0000-000000000002',
-  'Gemini':     'aaaaaaaa-0000-0000-0000-000000000003',
-  'Perplexity': 'aaaaaaaa-0000-0000-0000-000000000004',
-};
-const DEFAULT_PROJECT_ID = 'aaaaaaaa-0000-0000-0000-000000000001';
+let HajunCore = null;
+let InjectLayer = null;
+let SnapshotLayer = null;
+const HAJUNCORE_URL = 'https://hajuncore-app.vercel.app';
 
-async function getCredentials() {
-  return new Promise(resolve => {
-    chrome.storage.local.get(['supabaseUrl', 'supabaseKey', 'geminiApiKey'], resolve);
-  });
-}
+// Stub (임시)
+HajunCore = (ctx = {}) => ({ traceId: "tr-" + Date.now(), projectId: ctx.projectId || "aaaaaaaa-0000-0000-0000-000000000001", _error: null, ...ctx });
+InjectLayer = (ctx = {}) => { ctx = HajunCore(ctx); ctx.injectionPrompt = "🦈 맥락 주입 준비 완료 (Stub)"; return ctx; };
+SnapshotLayer = async (ctx = {}) => { ctx = HajunCore(ctx); return ctx; };
 
-async function supabaseFetch(url, key, path, options = {}) {
-  const res = await fetch(`${url}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      'apikey': key,
-      'Authorization': `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  });
-  const text = await res.text();
-  try { return JSON.parse(text); } catch(e) { return null; }
-}
+console.log("[Background] ✅ HajunCore Stub 로드 완료");
 
-async function summarizeWithGemini(text, apiKey) {
-  try {
-    const prompt = `개발자 대화를 분석하여 JSON만 반환하세요. 마크다운 금지.
-필드: last_task(80자 이내), summary(100자 이내 한 줄), next_action(구체적 다음 행동)
-
-대화:
-${text.substring(0, 3000)}`;
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 2048,
-            thinkingConfig: { thinkingBudget: 0 }
-          }
-        })
-      }
-    );
-
-    const data = await res.json();
-    if (data.error) return { _error: data.error.message };
-
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const cleaned = raw.replace(/```json|```/g, '').trim();
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) return { _error: 'JSON 파싱 실패' };
-    return JSON.parse(match[0]);
-  } catch(e) {
-    return { _error: e.message };
-  }
-}
-
-function buildPrompt({ lastTask, summary, nextAction }) {
-  return `🦈 BRAINPOOL — 이어서 작업
-
-[마지막 작업]
-${lastTask || '없음'}
-
-[현재 상황 요약]
-${summary || '없음'}
-
-[지금 바로 할 것]
-${nextAction || '맥락 확인 후 이어서 진행'}
-
----
-위 맥락을 기반으로 바로 이어서 작업해주세요.
-별도 설명 없이 [지금 바로 할 것]부터 시작하세요.`;
-}
-
-function detectAI(url) {
-  if (!url) return null;
-  if (url.includes('claude.ai')) return 'Claude';
-  if (url.includes('chatgpt.com')) return 'ChatGPT';
-  if (url.includes('gemini.google.com')) return 'Gemini';
-  if (url.includes('perplexity.ai')) return 'Perplexity';
-  return null;
-}
-
-async function handleSnapshot(data) {
-    console.log('===== SNAPSHOT =====');
-  console.log(data);
-  console.log('ai=', data.ai);
-  console.log('url=', data.url);
-  const traceId = 'tr-' + Date.now();
-
-  const { supabaseUrl, supabaseKey, geminiApiKey } = await getCredentials();
-
-  if (!supabaseUrl || !supabaseKey) {
-    return { success: false, error: 'Supabase 설정 필요', traceId };
-  }
-
-  const text = data?.text || '';
-  if (!text) {
-    return { success: false, error: '대화 내용 없음', traceId };
-  }
-
-  // AI 소스 감지 → project_id 결정
-  const aiSource = data.ai || detectAI(data.url);
-  const projectId = AI_PROJECT_MAP[aiSource] || DEFAULT_PROJECT_ID;
-  console.log(`[Snapshot] AI: ${aiSource || 'unknown'} → project_id: ${projectId}`);
-
-  let lastTask = '작업 진행 중';
-  let summary = '요약 없음';
-  let nextAction = '';
-
-  if (geminiApiKey) {
-    const geminiResult = await summarizeWithGemini(text, geminiApiKey);
-    if (!geminiResult._error) {
-      lastTask = geminiResult.last_task || lastTask;
-      summary = geminiResult.summary || summary;
-      nextAction = geminiResult.next_action || nextAction;
-    } else {
-      console.warn('[Snapshot] Gemini 실패:', geminiResult._error);
-    }
-  }
-
-  const contextPayload = {
-    project_id: projectId,
-    last_task: lastTask,
-    summary: summary,
-    next_action: nextAction,
-    updated_at: new Date().toISOString()
-  };
-
-  const saved = await supabaseFetch(
-    supabaseUrl, supabaseKey,
-    'contexts?on_conflict=project_id',
-    {
-      method: 'POST',
-      headers: {
-        'Prefer': 'resolution=merge-duplicates,return=representation',
-        'Content-Profile': 'public',
-        'Accept-Profile': 'public'
-      },
-      body: JSON.stringify(contextPayload)
-    }
-  );
-
-  if (!saved) {
-    console.warn('[Snapshot] Supabase 저장 실패');
-  }
-
-  const prompt = buildPrompt({ lastTask, summary, nextAction });
-
-  console.log(`[Snapshot] ✅ 완료 traceId: ${traceId}`);
-  return { success: true, summary, prompt, lastTask, nextAction, traceId };
-}
-
-async function getLatestContext() {
-  const { supabaseUrl, supabaseKey } = await getCredentials();
-  if (!supabaseUrl || !supabaseKey) return { _error: '설정 필요' };
-
-  const data = await supabaseFetch(
-    supabaseUrl, supabaseKey,
-    'contexts?order=updated_at.desc&limit=1',
-    { headers: { 'Accept-Profile': 'public' } }
-  );
-
-  const ctx = data?.[0];
-  if (!ctx) return { _error: '저장된 컨텍스트 없음' };
-
-  return {
-    success: true,
-    context: ctx,
-    prompt: buildPrompt({
-      lastTask: ctx.last_task,
-      summary: ctx.summary,
-      nextAction: ctx.next_action
-    })
-  };
-}
-
+// ==================== 메시지 핸들러 ====================
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'MANUAL_SNAPSHOT') {
-    handleSnapshot(msg.data)
-      .then(sendResponse)
-      .catch(e => sendResponse({ success: false, error: e.message }));
+  console.log(`[Background] 메시지: ${msg.type}`);
+
+  if (msg.type === 'POST_HAJUN_MESSAGE') {
+    handleHajunMessage(msg.data).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
+  if (msg.type === 'GET_HAJUN_SPACES') {
+    getHajunSpaces().then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
     return true;
   }
 
@@ -199,15 +30,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.scripting.executeScript({
       target: { tabId: msg.tabId },
       files: ['content.js']
-    }).then(() => sendResponse({ success: true }))
-      .catch(e => sendResponse({ success: false, error: e.message }));
-    return true;
-  }
-
-  if (msg.type === 'GET_LATEST_CONTEXT') {
-    getLatestContext()
-      .then(sendResponse)
-      .catch(e => sendResponse({ _error: e.message }));
+    }).then(() => {
+      sendResponse({ success: true });
+    }).catch(err => {
+      console.error("Content script injection failed:", err);
+      sendResponse({ success: false, error: err.message });
+    });
     return true;
   }
 
@@ -215,4 +43,47 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
-console.log("[Background] ✅ v1.2 로드 완료");
+async function hajunFetch(path, options = {}) {
+  const response = await fetch(HAJUNCORE_URL + path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  });
+  const text = await response.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { _error: text || 'JSON 응답 파싱 실패' }; }
+  if (!response.ok) return { _error: `하준아이 API 오류 (${response.status}): ${text}` };
+  return data;
+}
+
+async function getHajunSpaces() {
+  const yards = await hajunFetch('/api/hajun?action=yard_list');
+  if (yards._error) return { success: false, error: yards._error };
+  const list = await Promise.all((yards.payload || []).map(async (yard) => {
+    const rooms = await hajunFetch(`/api/hajun?action=room_list&yard=${encodeURIComponent(yard.key)}`);
+    return { ...yard, rooms: rooms.payload?.rooms || [], error: rooms._error || null };
+  }));
+  return { success: true, yards: list };
+}
+
+async function handleHajunMessage(data = {}) {
+  const { yard_key, room_key, author_name, msg_type, content, ref_ids = [] } = data;
+  if (!yard_key || !room_key) return { success: false, error: '마당과 방을 선택해주세요.' };
+  if (!content || !String(content).trim()) return { success: false, error: '저장할 대화 내용이 없습니다.' };
+
+  const source = data.ai ? `[출처: ${data.ai}]\n` : '';
+  const title = data.title ? `[제목: ${data.title}]\n` : '';
+  const url = data.url ? `[URL: ${data.url}]\n` : '';
+  const extractedAt = data.extractedAt ? `[추출시각: ${data.extractedAt}]\n` : '';
+  const result = await hajunFetch('/api/hajun?action=post_message', {
+    method: 'POST',
+    body: JSON.stringify({
+      yard_key, room_key, author_type: 'human',
+      author_name: author_name || data.ai || '외부 AI',
+      msg_type: msg_type || 'work_result',
+      content: `${source}${title}${url}${extractedAt}\n${String(content).trim()}`,
+      ref_ids: Array.isArray(ref_ids) ? ref_ids : []
+    })
+  });
+  if (result._error) return { success: false, error: result._error };
+  return { success: true, payload: result.payload || null, summary: `${yard_key}/${room_key}에 Message 저장 완료` };
+}

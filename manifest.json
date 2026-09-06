@@ -31,7 +31,8 @@
                              "https://chat.openai.com/*",
                              "https://gemini.google.com/*",
                              "https://www.perplexity.ai/*",
-                             "https://api.notion.com/*"
+    "https://api.notion.com/*",
+    "https://hajuncore-app.vercel.app/*"
                          ],
     "content_scripts":  [
                             {

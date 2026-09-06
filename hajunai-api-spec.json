@@ -1,0 +1,31 @@
+{
+  "baseUrl": "https://hajuncore-app.vercel.app",
+  "projectName": "BRAINPOOL OS / HajunAI",
+  "purpose": "Core Final 외부 AI 대화를 하준아이 master의 append-only Message로 전송",
+  "routes": [
+    {
+      "path": "/api/hajun?action=yard_list",
+      "method": "GET",
+      "description": "하준아이 마당 목록"
+    },
+    {
+      "path": "/api/hajun?action=room_list&yard={yard_key}",
+      "method": "GET",
+      "description": "선택한 마당의 방 목록"
+    },
+    {
+      "path": "/api/hajun?action=post_message",
+      "method": "POST",
+      "description": "선택한 방에 Message append",
+      "body": {
+        "yard_key": "gwanje | gaebal | brainpool",
+        "room_key": "기존 방 key",
+        "author_type": "human",
+        "author_name": "외부 AI",
+        "msg_type": "doc_injection | understanding | question | answer | decision | issue | work_result",
+        "content": "추출한 외부 AI 대화",
+        "ref_ids": []
+      }
+    }
+  ]
+}

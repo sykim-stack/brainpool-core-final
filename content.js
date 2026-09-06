@@ -8,18 +8,17 @@ const AI_SELECTORS = {
     assistantMessages: '[class*="font-claude-response-body"]'
   },
   'chatgpt.com': {
-  name: 'ChatGPT',
-  messages: '[data-message-id]',
-  roleAttr: 'data-message-author-role',
-  text: '[class*="prose"]'
-}
-
-'chat.openai.com': {
-  name: 'ChatGPT',
-  messages: '[data-message-id]',
-  roleAttr: 'data-message-author-role',
-  text: '[class*="prose"]'
-}
+    name: 'ChatGPT',
+    messages: '[data-message-id]',
+    roleAttr: 'data-author-role',
+    text: '[class*="prose"]'
+  },
+  'chat.openai.com': {
+    name: 'ChatGPT',
+    messages: '[data-message-id]',
+    roleAttr: 'data-author-role',
+    text: '[class*="prose"]'
+  },
   'gemini.google.com': {
     name: 'Gemini',
     userMessages: '.query-text, [class*="user-query"], .user-query-text',
@@ -90,23 +89,21 @@ const filtered = messages.filter(m => !isBrainpoolMessage(m.content));
 
 if (filtered.length === 0) return { error: '실제 대화 내용 없음 (시스템 메시지만 존재)' };
 
+const serializable = filtered.map(({ role, content, ai_source }) => ({ role, content, ai_source }));
+
 return {
   ai: config.name,
   url: location.href,
   title: document.title,
-  text: filtered.map(m => `${m.role === 'user' ? '사용자' : 'AI'}: ${m.content}`).join('\n---\n'),
-  data: filtered,
-  messageCount: filtered.length,
+  text: serializable.map(m => `${m.role === 'user' ? '사용자' : 'AI'}: ${m.content}`).join('\n---\n'),
+  data: serializable,
+  messageCount: serializable.length,
   extractedAt: new Date().toISOString()
 };
 
 
     messages.forEach(m => delete m._el);
   }
-
-console.log('messages=', messages.length);
-console.log('filtered=', filtered.length);
-console.log(messages);
 
   if (messages.length === 0) return { error: '메시지를 찾을 수 없음' };
 
