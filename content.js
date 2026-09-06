@@ -4,20 +4,20 @@ console.log('[BRAINPOOL] content.js v6.0 로드됨:', location.hostname);
 const AI_SELECTORS = {
   'claude.ai': {
     name: 'Claude',
-    userMessages: '[class*="font-user-message"]',
-    assistantMessages: '[class*="font-claude-response-body"]'
+    userMessages: '[data-testid="user-message"], [data-testid*="user-message"], [class*="font-user-message"]',
+    assistantMessages: '[data-testid="assistant-message"], [data-testid*="assistant-message"], [class*="font-claude-response-body"]'
   },
   'chatgpt.com': {
     name: 'ChatGPT',
-    messages: '[data-message-id]',
-    roleAttr: 'data-author-role',
-    text: '[class*="prose"]'
+    messages: '[data-message-id], [data-testid*="conversation-turn"]',
+    roleAttrs: ['data-author-role', 'data-message-author-role'],
+    text: '[class*="prose"], [data-message-content]'
   },
   'chat.openai.com': {
     name: 'ChatGPT',
-    messages: '[data-message-id]',
-    roleAttr: 'data-author-role',
-    text: '[class*="prose"]'
+    messages: '[data-message-id], [data-testid*="conversation-turn"]',
+    roleAttrs: ['data-author-role', 'data-message-author-role'],
+    text: '[class*="prose"], [data-message-content]'
   },
   'gemini.google.com': {
     name: 'Gemini',
@@ -41,9 +41,9 @@ function extractConversation() {
   const messages = [];
 
   // ChatGPT: roleAttr 방식
-  if (config.roleAttr) {
+  if (config.roleAttrs) {
     document.querySelectorAll(config.messages).forEach(el => {
-      const role = el.getAttribute(config.roleAttr);
+      const role = config.roleAttrs.map(attr => el.getAttribute(attr)).find(Boolean);
       if (!role) return;
       const textEl = config.text ? el.querySelector(config.text) : el;
       const content = textEl?.innerText?.trim();
@@ -84,12 +84,18 @@ function extractConversation() {
       return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     });
 
-    // BRAINPOOL 시스템 메시지 제거
-const filtered = messages.filter(m => !isBrainpoolMessage(m.content));
+    // 대화 원문은 그대로 보존한다. BRAINPOOL 문구가 포함된 사용자 질문이나
+    // AI 답변도 프로젝트 맥락의 일부이므로 시스템 메시지로 일괄 제거하지 않는다.
+    if (messages.length === 0) {
+      const main = document.querySelector('main, [role="main"]');
+      const mainText = main?.innerText?.trim();
+      if (mainText && mainText.length > 20) {
+        messages.push({ role: 'conversation', content: mainText, ai_source: config.name, _el: main });
+      }
+    }
+    if (messages.length === 0) return { error: '메시지를 찾을 수 없음' };
 
-if (filtered.length === 0) return { error: '실제 대화 내용 없음 (시스템 메시지만 존재)' };
-
-const serializable = filtered.map(({ role, content, ai_source }) => ({ role, content, ai_source }));
+const serializable = messages.map(({ role, content, ai_source }) => ({ role, content, ai_source }));
 
 return {
   ai: config.name,

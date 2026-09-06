@@ -69,44 +69,8 @@ function initSettings() {
 
 // ========== 4. Action Engine 데이터 로드 ==========
 async function loadActionTabData() {
-  try {
-    const { supabaseUrl, supabaseKey } = await getSupabaseCredentials();
-    if (!supabaseUrl || !supabaseKey) return;
-
-    const res = await fetch(`${supabaseUrl}/rest/v1/contexts?select=next_action,action_reasoning,summary,current_problems,health_score&order=updated_at.desc&limit=1`, {
-      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
-    });
-    if (!res.ok) return;
-
-    const text = await res.text();
-    let contexts = [];
-    try { contexts = JSON.parse(text); } catch(e) { return; }
-    if (contexts.length === 0) return;
-
-    const ctx = contexts[0];
     const actionContainer = document.getElementById('actionEngineContainer');
-    if (!actionContainer) return;
-
-    if (ctx.next_action && ctx.next_action !== 'null' && ctx.next_action !== '') {
-      actionContainer.innerHTML = `
-        <div class="record-card" style="border-left: 4px solid var(--accent2); margin-top: 8px;">
-          <div class="record-top"><span class="record-project">🎯 추천 다음 행동</span></div>
-          <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">${escapeHtml(ctx.next_action)}</div>
-          <div style="font-size: 11px; color: var(--text2); margin-bottom: 4px;">📌 현재 상태: ${escapeHtml(ctx.summary || '분석 중')}</div>
-          ${ctx.current_problems && ctx.current_problems !== '없음' ? `<div style="font-size: 11px; color: var(--warn);">⚠️ 문제: ${escapeHtml(ctx.current_problems)}</div>` : ''}
-          ${ctx.action_reasoning && ctx.action_reasoning !== '없음' ? `<div style="font-size: 11px; color: var(--text2);">💡 ${escapeHtml(ctx.action_reasoning)}</div>` : ''}
-          <div style="font-size: 10px; color: var(--accent); margin-top: 6px;">🏥 건강 점수: ${ctx.health_score || 'N/A'}/100</div>
-        </div>
-      `;
-    } else {
-      actionContainer.innerHTML = `
-        <div class="record-card" style="border-left: 4px solid var(--text3); margin-top: 8px;">
-          <div class="record-top"><span class="record-project">⏳ Action Engine 대기 중</span></div>
-          <div style="font-size: 12px; color: var(--text2);">대화를 저장하면 다음 행동이 추천됩니다.</div>
-        </div>
-      `;
-    }
-  } catch(e) { console.warn('Action 데이터 로드 실패:', e); }
+    if (actionContainer) actionContainer.innerHTML = '<div class="record-card" style="border-left: 4px solid var(--text3);"><div style="font-size: 12px; color: var(--text2);">하준아이 Message를 저장하면 이 공간에 표시됩니다.</div></div>';
 }
 
 // ========== 5. AI 탭 스캔 및 저장 ==========
@@ -121,14 +85,16 @@ async function scanAITabs() {
     const allTabs = await chrome.tabs.query({});
     const aiSites = ['claude.ai', 'chatgpt.com', 'gemini.google.com', 'perplexity.ai'];
     const aiTabs = allTabs.filter(tab => tab.url && aiSites.some(site => tab.url.includes(site)));
-    currentTabs = aiTabs;
-    if (aiTabs.length === 0) {
+    const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeAiTabs = activeTabs.filter(tab => tab.url && aiSites.some(site => tab.url.includes(site)));
+    currentTabs = [...activeAiTabs, ...aiTabs.filter(tab => !activeAiTabs.some(active => active.id === tab.id))];
+    if (currentTabs.length === 0) {
       listEl.innerHTML = `<div class="ai-item"><span class="ai-name">감지된 AI 없음</span><span class="ai-status">대기</span></div>
         <div style="font-size:11px; margin-top:8px;">💡 Claude/ChatGPT/Gemini/Perplexity 탭을 열고 새로고침하세요</div>`;
       if (saveBtn) saveBtn.disabled = true;
       return;
     }
-    listEl.innerHTML = aiTabs.map(tab => `
+    listEl.innerHTML = currentTabs.map(tab => `
       <div class="ai-item" data-tab-id="${tab.id}">
         <span class="ai-name">${getAIName(tab.url)}</span>
         <span class="ai-status active">● 연결됨</span>
