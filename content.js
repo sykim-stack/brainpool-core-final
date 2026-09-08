@@ -94,9 +94,35 @@ function extractConversation() {
   };
 }
 
+function findComposer() {
+  const selectors = [
+    'textarea[placeholder*="메시지"]', 'textarea[placeholder*="Message"]', 'textarea[placeholder*="Send"]',
+    '[contenteditable="true"][role="textbox"]', '[contenteditable="true"][data-placeholder]',
+    'textarea', '[contenteditable="true"]',
+  ];
+  return selectors.map(s => document.querySelector(s)).find(Boolean) || null;
+}
+
+function injectIntoComposer(text) {
+  const composer = findComposer();
+  if (!composer) return { success: false, error: '외부 AI 입력창을 찾지 못했습니다. 대화 화면을 열어주세요.' };
+  composer.focus();
+  if (composer.matches('textarea, input')) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    if (setter) setter.call(composer, text); else composer.value = text;
+    composer.dispatchEvent(new Event('input', { bubbles: true }));
+    composer.dispatchEvent(new Event('change', { bubbles: true }));
+  } else {
+    composer.textContent = text;
+    composer.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+  }
+  return { success: true };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'PING') { sendResponse('pong'); return true; }
   if (msg.type === 'EXTRACT_CONVERSATION') { sendResponse(extractConversation()); return true; }
+  if (msg.type === 'INJECT_HAJUN_CONTEXT') { sendResponse(injectIntoComposer(msg.text || '')); return true; }
   return false;
 });
 chrome.runtime.sendMessage({ type: 'CONTENT_SCRIPT_READY', host: location.hostname, url: location.href }).catch(() => {});

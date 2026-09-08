@@ -386,6 +386,36 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// [하준아이 역방향 주입 2026-09-08]
+// URL 접근이 제한된 외부 AI에는 방 기록을 텍스트로 직접 입력한다.
+async function injectSelectedRoomContext() {
+  const btn = document.getElementById('btnInjectRoomContext');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 방 맥락 불러오는 중...'; }
+  try {
+    const space = getSelectedHajunSpace();
+    if (!space.yard_key || !space.room_key) throw new Error('먼저 하준아이 마당과 방을 선택해주세요.');
+    const tab = currentTabs[0];
+    if (!tab?.id) throw new Error('Claude·ChatGPT·Gemini 등 외부 AI 탭을 먼저 열어주세요.');
+    const result = await sendMessageToBg({
+      type: 'INJECT_HAJUN_CONTEXT',
+      tabId: tab.id,
+      data: space,
+    });
+    if (!result?.success) throw new Error(result?.error || '맥락 주입 실패');
+    const promptBox = document.getElementById('promptBox');
+    const summaryArea = document.getElementById('summaryArea');
+    if (promptBox && summaryArea) {
+      promptBox.innerText = result.preview || '방 맥락이 입력창에 주입되었습니다.';
+      summaryArea.style.display = 'block';
+    }
+    alert(`✅ ${result.messageCount || 0}개 방 기록을 외부 AI 입력창에 넣었습니다.\n내용을 확인한 뒤 직접 전송하세요.`);
+  } catch (e) {
+    alert(`❌ 방 맥락 주입 실패: ${e.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📥 선택한 방 맥락을 외부 AI 입력창에 주입'; }
+  }
+}
+
 // ========== 9. 이어가기 프롬프트 생성 (HajunCore InjectLayer v0.2) ==========
 async function generateContinuePrompt() {
   const btn = document.getElementById('btnInjectContinue') || document.getElementById('btnContinueContext');
@@ -462,6 +492,8 @@ document.addEventListener('DOMContentLoaded', () => {
   
   const continueBtn = document.getElementById('btnContinueContext');
   if (continueBtn) continueBtn.addEventListener('click', generateContinuePrompt);
+  const roomInjectBtn = document.getElementById('btnInjectRoomContext');
+  if (roomInjectBtn) roomInjectBtn.addEventListener('click', injectSelectedRoomContext);
 
   runHealthCheck();
   scanAITabs();
