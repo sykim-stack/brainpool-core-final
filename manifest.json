@@ -1,7 +1,7 @@
-﻿{
+{
     "manifest_version":  3,
     "name":  "BRAINPOOL Core",
-    "version":  "1.0.0",
+    "version":  "1.1.0",
     "description":  "AI 대화 저장 및 다음 행동 추천 - F",
     "icons":  {
                   "16":  "icons/icon16.png",
