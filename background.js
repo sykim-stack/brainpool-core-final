@@ -170,7 +170,10 @@ async function handleHajunProductCapture(data = {}) {
   const timeline = await hajunFetch(`/api/hajun?action=product_timeline&internal_code=${encodeURIComponent(internal_code)}`);
   if (timeline._error) return { success: false, error: timeline._error };
   const existing = timeline.payload?.messages || [];
-  const sourceMessage = existing.find(m => m.metadata?.entity_type === 'product_candidate');
+  const sourceMessage = existing.find(m =>
+    m.metadata?.entity_type === 'product_candidate' ||
+    String(m.content || '').includes(`[상품식별코드: ${internal_code}]`)
+  );
   if (sourceMessage) {
     return {
       success: true,
@@ -189,7 +192,7 @@ async function handleHajunProductCapture(data = {}) {
       author_type: 'human',
       author_name: data.author_name || `${source} 캡처`,
       msg_type: 'doc_injection',
-      content: String(content).trim(),
+      content: `[상품식별코드: ${internal_code}]\n[출처: ${source}]\n[원문 URL: ${source_url || ''}]\n[캡처시각: ${captured_at || new Date().toISOString()}]\n\n${String(content).trim()}`,
       ref_ids: [],
       metadata: {
         ...metadata,
