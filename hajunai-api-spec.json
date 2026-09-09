@@ -25,7 +25,7 @@
         "msg_type": "doc_injection | understanding | question | answer | decision | issue | work_result",
         "content": "추출한 외부 AI 대화",
         "ref_ids": [],
-        "metadata": "상품검증 시 entity_type, internal_code, source, source_product_code 등을 포함; DB 컬럼 확인 후 활성화"
+        "metadata": "상품검증 시 entity_type=product_candidate, internal_code=source:source_product_code, source, source_product_code, source_url, captured_at 등을 포함; hajun_messages에 저장"
       }
     },
     {

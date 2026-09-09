@@ -21,6 +21,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'POST_HAJUN_PRODUCT_CAPTURE') {
+    handleHajunProductCapture(msg.data).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
   if (msg.type === 'GET_HAJUN_SPACES') {
     getHajunSpaces().then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
     return true;
@@ -135,4 +140,71 @@ async function handleHajunMessage(data = {}) {
   });
   if (result._error) return { success: false, error: result._error };
   return { success: true, payload: result.payload || null, summary: `${yard_key}/${room_key}에 Message 저장 완료` };
+}
+
+async function handleHajunProductCapture(data = {}) {
+  const {
+    yard_key,
+    room_key,
+    source,
+    source_product_code,
+    internal_code,
+    name,
+    content,
+    source_url,
+    captured_at,
+    metadata = {}
+  } = data;
+
+  if (!yard_key || !room_key) return { success: false, error: '상품검증마당과 방을 선택해주세요.' };
+  if (!source || !source_product_code) return { success: false, error: 'source와 source_product_code가 필요합니다.' };
+  const expectedCode = `${source}:${source_product_code}`;
+  if (internal_code !== expectedCode) return { success: false, error: `internal_code는 ${expectedCode} 형식이어야 합니다.` };
+  if (!content || !String(content).trim()) return { success: false, error: '저장할 상품 원문이 없습니다.' };
+
+  const timeline = await hajunFetch(`/api/hajun?action=product_timeline&internal_code=${encodeURIComponent(internal_code)}`);
+  if (timeline._error) return { success: false, error: timeline._error };
+  const existing = timeline.payload?.messages || [];
+  const sourceMessage = existing.find(m => m.metadata?.entity_type === 'product_candidate');
+  if (sourceMessage) {
+    return {
+      success: true,
+      duplicate: true,
+      payload: sourceMessage,
+      message_id: sourceMessage.id || null,
+      summary: '기존 상품 후보를 사용합니다. 원문은 중복 저장하지 않았습니다.'
+    };
+  }
+
+  const result = await hajunFetch('/api/hajun?action=post_message', {
+    method: 'POST',
+    body: JSON.stringify({
+      yard_key,
+      room_key,
+      author_type: 'human',
+      author_name: data.author_name || `${source} 캡처`,
+      msg_type: 'doc_injection',
+      content: String(content).trim(),
+      ref_ids: [],
+      metadata: {
+        ...metadata,
+        entity_type: 'product_candidate',
+        internal_code,
+        source,
+        source_product_code,
+        name: name || metadata.name || '',
+        source_url: source_url || metadata.source_url || '',
+        captured_at: captured_at || metadata.captured_at || new Date().toISOString()
+      }
+    })
+  });
+  if (result._error) return { success: false, error: result._error };
+  const payload = result.payload || null;
+  return {
+    success: true,
+    duplicate: false,
+    payload,
+    message_id: payload?.id || null,
+    summary: `${internal_code} 상품 원문 저장 완료`
+  };
 }

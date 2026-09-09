@@ -83,3 +83,13 @@ git diff --check
 - 검증: 로컬을 원격 `4b5d4e8`까지 fast-forward 동기화
 - 다음 작업: HajunAI DB의 metadata·상품검증 방 key 확인 후 캡처 저장 API 연결
 - 주의: 저장 API가 확정되기 전 온채널·네이버 추출기를 만들지 않음
+
+### 작업 로그: 2026-09-09 10:21
+
+- 담당: Manus 1
+- 작업: HajunCore 계약 문서 추가, `post_message`의 metadata·yard/room key 지원, 상품 후보 조회 action 로컬 구현, `POST_HAJUN_PRODUCT_CAPTURE` background action 구현
+- 변경 파일: `background.js`, `hajunai-api-spec.json` 확인, HajunCore `docs/HAJUNAI_PRODUCT_EXTENSION_CONTRACT.md`, `app/api/hajun/route.ts`, `types/hajun.ts`
+- HajunAI 계약 상태: 상품 원문은 `hajun_messages`에만 저장하며, `hajun_posts`에는 신규 상품 원문을 쓰지 않음. `internal_code=source:source_product_code` 검증 추가
+- 검증: 확장프로그램 `node --check` 3개 파일 통과, `git diff --check` 통과, HajunCore `npm run build` 통과. 배포 API의 `product_candidates`, `product_random`, `product_timeline` 빈 응답 확인
+- 다음 작업: 배포 DB의 `metadata` 저장과 상품검증마당·방 seed를 확인한 뒤 온채널 수동 extractor 연결
+- 주의: 현재 배포 API에는 상품 조회 action이 응답하지만 `product_validation` 마당은 아직 존재하지 않음. 실제 상품 캡처는 seed와 metadata 저장을 확인한 뒤 활성화
