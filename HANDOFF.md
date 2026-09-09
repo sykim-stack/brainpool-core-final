@@ -113,3 +113,11 @@ git diff --check
 - 검증: `node --check` background/content/product-content/popup 통과, `git diff --check` 통과, HajunCore `npm run build` 통과
 - 다음 작업: 배포 API에서 상품검증마당과 방 응답을 정상 확인한 뒤 Chrome에서 온채널 상세페이지 수동 캡처를 테스트
 - 주의: 현재 배포 endpoint의 상품검증마당 응답 본문이 비어 있어 운영 seed/API 상태를 먼저 확인해야 함. extractor는 사용자가 상품검증마당과 방을 선택한 경우에만 실행됨
+
+### 작업 로그: 2026-09-09 13:27
+
+- 담당: Manus 1
+- 작업: 운영 단일 DB를 Supabase `Jena-Voca-01` (`grlfocvlfatuvphkyivd`)로 확정하고 상품검증 migration 적용
+- 결과: `product_validation` 마당, 4개 기능방, `hajun_messages.metadata jsonb` 컬럼 생성 확인
+- 검증: Supabase MCP 조회와 운영 API의 `room_list&yard=product_validation` 응답 확인
+- 주의: `hajunai` 프로젝트에는 Hajun 테이블이 없으므로 운영 DB로 사용하지 않음. 상품 후보 조회 API는 별도 배포 코드 확인이 필요함
