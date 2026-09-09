@@ -103,3 +103,13 @@ git diff --check
 - 검증: migration 파일 존재 및 로컬 소스 반영 예정. 운영 DB에는 아직 적용하지 않음
 - 다음 작업: Supabase SQL Editor에서 migration 적용 후 마당·방·metadata 컬럼 확인
 - 주의: 운영 DB migration 적용 전 온채널·네이버 extractor를 활성화하지 않음
+
+### 작업 로그: 2026-09-09 10:33
+
+- 담당: Manus 1
+- 작업: 온채널 수동 상품 원문 extractor, 팝업 캡처 버튼, background 캡처·중복 확인·HajunAI 전송 연결 구현
+- 변경 파일: `content/product-content.js`, `popup/popup.html`, `popup/popup.js`, `background.js`
+- HajunAI 계약 상태: 캡처 payload에 `internal_code`, 원문, source URL, captured_at, metadata를 포함하고 저장 응답의 message ID를 표시함
+- 검증: `node --check` background/content/product-content/popup 통과, `git diff --check` 통과, HajunCore `npm run build` 통과
+- 다음 작업: 배포 API에서 상품검증마당과 방 응답을 정상 확인한 뒤 Chrome에서 온채널 상세페이지 수동 캡처를 테스트
+- 주의: 현재 배포 endpoint의 상품검증마당 응답 본문이 비어 있어 운영 seed/API 상태를 먼저 확인해야 함. extractor는 사용자가 상품검증마당과 방을 선택한 경우에만 실행됨

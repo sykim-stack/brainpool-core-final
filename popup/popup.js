@@ -151,6 +151,38 @@ function getSelectedHajunSpace() {
   };
 }
 
+async function captureActiveProduct() {
+  const btn = document.getElementById('btnCaptureProduct');
+  const status = document.getElementById('productCaptureStatus');
+  if (!btn || !status) return;
+  const space = getSelectedHajunSpace();
+  if (!space.yard_key || !space.room_key) {
+    status.textContent = '먼저 상품검증마당과 상품발굴방을 선택해주세요.';
+    return;
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    status.textContent = '현재 탭을 찾을 수 없습니다.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '캡처 중...';
+  status.textContent = '현재 페이지의 상품 원문을 읽는 중입니다.';
+  try {
+    const result = await sendMessageToBg({ type: 'CAPTURE_ACTIVE_PRODUCT', tabId: tab.id, data: space });
+    if (!result?.success) throw new Error(result?.error || '상품 캡처 실패');
+    const product = result.extracted || {};
+    status.textContent = result.duplicate
+      ? `기존 후보 사용\n${product.internal_code || result.message_id}`
+      : `저장 완료\n${product.internal_code || ''}\nMessage ID: ${result.message_id || '없음'}`;
+  } catch (error) {
+    status.textContent = `저장 실패\n${error.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '상품 원문 캡처';
+  }
+}
+
 // 저장 함수 - 저장 후 요약/프롬프트 표시 영역 업데이트
 async function saveCurrentConversation() {
   const btn = document.getElementById('btnSaveNow');
@@ -494,6 +526,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (continueBtn) continueBtn.addEventListener('click', generateContinuePrompt);
   const roomInjectBtn = document.getElementById('btnInjectRoomContext');
   if (roomInjectBtn) roomInjectBtn.addEventListener('click', injectSelectedRoomContext);
+  const productCaptureBtn = document.getElementById('btnCaptureProduct');
+  if (productCaptureBtn) productCaptureBtn.addEventListener('click', captureActiveProduct);
 
   runHealthCheck();
   scanAITabs();

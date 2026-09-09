@@ -26,6 +26,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'CAPTURE_ACTIVE_PRODUCT') {
+    captureActiveProduct(msg.tabId, msg.data).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
   if (msg.type === 'GET_HAJUN_SPACES') {
     getHajunSpaces().then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
     return true;
@@ -207,4 +212,19 @@ async function handleHajunProductCapture(data = {}) {
     message_id: payload?.id || null,
     summary: `${internal_code} 상품 원문 저장 완료`
   };
+}
+
+async function captureActiveProduct(tabId, space = {}) {
+  if (!tabId) return { success: false, error: '현재 탭을 찾을 수 없습니다.' };
+  if (!space.yard_key || !space.room_key) return { success: false, error: '상품검증마당과 방을 선택해주세요.' };
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content/product-content.js'] });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const extracted = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_PRODUCT' });
+    if (!extracted || extracted.error) return { success: false, error: extracted?.error || '상품 원문 추출 실패' };
+    const saved = await handleHajunProductCapture({ ...extracted, ...space });
+    return { ...saved, extracted };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
