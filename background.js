@@ -167,6 +167,17 @@ async function handleHajunProductCapture(data = {}) {
   if (internal_code !== expectedCode) return { success: false, error: `internal_code는 ${expectedCode} 형식이어야 합니다.` };
   if (!content || !String(content).trim()) return { success: false, error: '저장할 상품 원문이 없습니다.' };
 
+  const localCapture = await chrome.storage.local.get(`product_capture:${internal_code}`);
+  if (localCapture[`product_capture:${internal_code}`]) {
+    return {
+      success: true,
+      duplicate: true,
+      payload: localCapture[`product_capture:${internal_code}`],
+      message_id: localCapture[`product_capture:${internal_code}`].id || null,
+      summary: '이 브라우저에서 이미 캡처한 상품입니다. 원문은 중복 저장하지 않았습니다.'
+    };
+  }
+
   const timeline = await hajunFetch(`/api/hajun?action=product_timeline&internal_code=${encodeURIComponent(internal_code)}`);
   if (timeline._error) return { success: false, error: timeline._error };
   const existing = timeline.payload?.messages || [];
@@ -208,6 +219,7 @@ async function handleHajunProductCapture(data = {}) {
   });
   if (result._error) return { success: false, error: result._error };
   const payload = result.payload || null;
+  await chrome.storage.local.set({ [`product_capture:${internal_code}`]: payload || { internal_code, saved_at: new Date().toISOString() } });
   return {
     success: true,
     duplicate: false,
