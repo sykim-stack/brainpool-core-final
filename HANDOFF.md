@@ -93,3 +93,13 @@ git diff --check
 - 검증: 확장프로그램 `node --check` 3개 파일 통과, `git diff --check` 통과, HajunCore `npm run build` 통과. 배포 API의 `product_candidates`, `product_random`, `product_timeline` 빈 응답 확인
 - 다음 작업: 배포 DB의 `metadata` 저장과 상품검증마당·방 seed를 확인한 뒤 온채널 수동 extractor 연결
 - 주의: 현재 배포 API에는 상품 조회 action이 응답하지만 `product_validation` 마당은 아직 존재하지 않음. 실제 상품 캡처는 seed와 metadata 저장을 확인한 뒤 활성화
+
+### 작업 로그: 2026-09-09 10:25
+
+- 담당: Manus 1
+- 작업: 상품검증마당·4개 기능방·`hajun_messages.metadata`를 준비하는 idempotent Supabase migration 작성
+- 변경 파일: HajunCore `docs/migrations/20260909_product_validation.sql`, `types/hajun.ts`
+- HajunAI 계약 상태: `product_validation` 마당, `product_discovery`, `market_research`, `product_validation`, `approved_products` 방을 기능 단위로 사용하며 상품별 방은 생성하지 않음
+- 검증: migration 파일 존재 및 로컬 소스 반영 예정. 운영 DB에는 아직 적용하지 않음
+- 다음 작업: Supabase SQL Editor에서 migration 적용 후 마당·방·metadata 컬럼 확인
+- 주의: 운영 DB migration 적용 전 온채널·네이버 extractor를 활성화하지 않음
