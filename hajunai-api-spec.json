@@ -24,8 +24,24 @@
         "author_name": "외부 AI",
         "msg_type": "doc_injection | understanding | question | answer | decision | issue | work_result",
         "content": "추출한 외부 AI 대화",
-        "ref_ids": []
+        "ref_ids": [],
+        "metadata": "상품검증 시 entity_type, internal_code, source, source_product_code 등을 포함; DB 컬럼 확인 후 활성화"
       }
+    },
+    {
+      "path": "/api/hajun?action=product_candidates",
+      "method": "GET",
+      "description": "hajun_messages의 상품 후보를 internal_code별로 조회"
+    },
+    {
+      "path": "/api/hajun?action=product_random",
+      "method": "GET",
+      "description": "상품 원문을 복제하지 않고 후보 message ID를 랜덤 선택"
+    },
+    {
+      "path": "/api/hajun?action=product_timeline&internal_code={code}",
+      "method": "GET",
+      "description": "상품 후보의 HajunAI 메시지 이력 조회"
     }
   ]
 }
