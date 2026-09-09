@@ -131,15 +131,31 @@ async function loadHajunSpaces() {
     return;
   }
   hajunSpaces = result.yards || [];
+  const saved = await new Promise(resolve => chrome.storage.local.get(['selectedHajunSpace'], resolve));
+  const savedSpace = saved.selectedHajunSpace || {};
   yardSelect.innerHTML = '<option value="">마당 선택</option>' + hajunSpaces.map(y => `<option value="${y.key}">${y.name}</option>`).join('');
-  roomSelect.innerHTML = '<option value="">마당을 먼저 선택하세요</option>';
-  if (status) status.textContent = '하준아이 master 연결됨 · 마당과 방을 선택하세요.';
-  yardSelect.addEventListener('change', () => {
+  yardSelect.value = savedSpace.yard_key || '';
+  const populateRooms = () => {
     const yard = hajunSpaces.find(y => y.key === yardSelect.value);
     roomSelect.innerHTML = yard
       ? '<option value="">방 선택</option>' + (yard.rooms || []).map(r => `<option value="${r.key}">${r.name}</option>`).join('')
       : '<option value="">마당을 먼저 선택하세요</option>';
-  });
+    roomSelect.value = savedSpace.room_key || '';
+  };
+  populateRooms();
+  if (status) status.textContent = '하준아이 master 연결됨 · 마당과 방을 선택하세요.';
+  yardSelect.onchange = () => { populateRooms(); persistSelectedHajunSpace(); };
+  roomSelect.onchange = persistSelectedHajunSpace;
+  document.getElementById('hajunMsgTypeSelect').onchange = persistSelectedHajunSpace;
+  document.getElementById('hajunAuthorName').oninput = persistSelectedHajunSpace;
+}
+
+function persistSelectedHajunSpace() {
+  chrome.storage.local.set({ selectedHajunSpace: getSelectedHajunSpace() });
+  const status = document.getElementById('hajunSpaceStatus');
+  if (status && getSelectedHajunSpace().yard_key && getSelectedHajunSpace().room_key) {
+    status.textContent = '선택 공간 저장됨 · 팝업을 닫아도 유지됩니다.';
+  }
 }
 
 function getSelectedHajunSpace() {
@@ -530,6 +546,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (roomInjectBtn) roomInjectBtn.addEventListener('click', injectSelectedRoomContext);
   const productCaptureBtn = document.getElementById('btnCaptureProduct');
   if (productCaptureBtn) productCaptureBtn.addEventListener('click', captureActiveProduct);
+  const saveSpaceBtn = document.getElementById('btnSaveHajunSpace');
+  if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', () => {
+    persistSelectedHajunSpace();
+    saveSpaceBtn.textContent = '✅ 선택 공간 저장됨';
+    setTimeout(() => { saveSpaceBtn.textContent = '💾 선택 공간 저장'; }, 1500);
+  });
 
   runHealthCheck();
   scanAITabs();
