@@ -172,9 +172,11 @@ async function captureActiveProduct() {
     const result = await sendMessageToBg({ type: 'CAPTURE_ACTIVE_PRODUCT', tabId: tab.id, data: space });
     if (!result?.success) throw new Error(result?.error || '상품 캡처 실패');
     const product = result.extracted || {};
-    status.textContent = result.duplicate
+    const statusText = result.duplicate
       ? `기존 후보 사용\n${product.internal_code || result.message_id}`
       : `저장 완료\n${product.internal_code || ''}\nMessage ID: ${result.message_id || '없음'}`;
+    status.textContent = statusText;
+    chrome.storage.local.set({ lastProductCaptureStatus: { text: statusText, at: new Date().toISOString() } });
   } catch (error) {
     status.textContent = `저장 실패\n${error.message}`;
   } finally {
@@ -533,11 +535,16 @@ document.addEventListener('DOMContentLoaded', () => {
   scanAITabs();
   updateSnapshotCountDisplay();
 
-  chrome.storage.local.get(['lastSummary', 'lastPrompt'], (result) => {
+  chrome.storage.local.get(['lastSummary', 'lastPrompt', 'lastProductCaptureStatus'], (result) => {
     if (result.lastSummary) {
       document.getElementById('summaryText').innerText = result.lastSummary;
       document.getElementById('promptBox').innerText = result.lastPrompt || '(저장된 프롬프트 없음)';
       document.getElementById('summaryArea').style.display = 'block';
+    }
+    const productStatus = document.getElementById('productCaptureStatus');
+    if (productStatus && result.lastProductCaptureStatus?.text) {
+      const at = result.lastProductCaptureStatus.at ? new Date(result.lastProductCaptureStatus.at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+      productStatus.textContent = `${result.lastProductCaptureStatus.text}${at ? `\n마지막 처리: ${at}` : ''}`;
     }
     // 복사 버튼 이벤트 (저장된 프롬프트가 있을 경우)
 const copyBtn = document.getElementById('btnCopyPrompt');
