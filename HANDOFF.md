@@ -127,3 +127,12 @@ git diff --check
 - 검증: 코어 파이널 4개 JS `node --check` 통과; 운영 API `product_candidates`와 `product_random` 응답 확인
 - 다음 작업: 실제 Chrome 온채널 상세페이지에서 캡처 버튼을 눌러 저장·중복 결과 확인
 - 주의: 네이버 조사 extractor와 승인 승격 흐름은 아직 미구현
+
+### 작업 로그: 2026-09-10 17:31
+- 담당: Manus 2
+- 작업: 대상 공간 저장을 `chrome.storage.local` 저장 후 재조회 검증 방식으로 보강
+- 변경 파일: `popup/popup.js`
+- 결정: 저장 성공·실패를 버튼과 상태 문구에 표시하고, 마당·방이 비어 있으면 저장하지 않음
+- 검증: `node --check background.js`, `content.js`, `content/product-content.js`, `popup/popup.js`, `git diff --check` 통과
+- 다음 작업: Chrome 확장 프로그램을 새로고침한 뒤 마당·방 선택 → 선택 공간 저장 → 팝업 재개방으로 실제 확인
+- 주의: 브라우저의 확장 프로그램 저장소를 직접 확인해야 하므로 현재 정적 검증만 완료

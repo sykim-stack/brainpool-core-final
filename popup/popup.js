@@ -151,11 +151,30 @@ async function loadHajunSpaces() {
 }
 
 function persistSelectedHajunSpace() {
-  chrome.storage.local.set({ selectedHajunSpace: getSelectedHajunSpace() });
+  const selected = getSelectedHajunSpace();
   const status = document.getElementById('hajunSpaceStatus');
-  if (status && getSelectedHajunSpace().yard_key && getSelectedHajunSpace().room_key) {
-    status.textContent = '선택 공간 저장됨 · 팝업을 닫아도 유지됩니다.';
+  if (!selected.yard_key || !selected.room_key) {
+    if (status) status.textContent = '마당과 방을 모두 선택해야 저장할 수 있습니다.';
+    return Promise.resolve(false);
   }
+  if (status) status.textContent = '선택 공간 저장 중...';
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ selectedHajunSpace: selected }, () => {
+      if (chrome.runtime.lastError) {
+        if (status) status.textContent = `⚠ 선택 공간 저장 실패: ${chrome.runtime.lastError.message}`;
+        resolve(false);
+        return;
+      }
+      chrome.storage.local.get(['selectedHajunSpace'], (result) => {
+        const saved = result.selectedHajunSpace || {};
+        const verified = saved.yard_key === selected.yard_key && saved.room_key === selected.room_key;
+        if (status) status.textContent = verified
+          ? '선택 공간 저장됨 · 팝업을 닫아도 유지됩니다.'
+          : '⚠ 저장 확인 실패 · 확장 프로그램을 새로고침하세요.';
+        resolve(verified);
+      });
+    });
+  });
 }
 
 function getSelectedHajunSpace() {
@@ -548,9 +567,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (productCaptureBtn) productCaptureBtn.addEventListener('click', captureActiveProduct);
   const saveSpaceBtn = document.getElementById('btnSaveHajunSpace');
   if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', () => {
-    persistSelectedHajunSpace();
-    saveSpaceBtn.textContent = '✅ 선택 공간 저장됨';
-    setTimeout(() => { saveSpaceBtn.textContent = '💾 선택 공간 저장'; }, 1500);
+    persistSelectedHajunSpace().then((saved) => {
+      saveSpaceBtn.textContent = saved ? '✅ 선택 공간 저장됨' : '⚠ 저장 실패';
+      setTimeout(() => { saveSpaceBtn.textContent = '💾 선택 공간 저장'; }, 1800);
+    });
   });
 
   runHealthCheck();
