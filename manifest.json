@@ -34,7 +34,10 @@
     "https://api.notion.com/*",
     "https://hajuncore-app.vercel.app/*",
     "https://*.naver.com/*",
-    "https://*.naver.net/*"
+    "https://*.naver.net/*",
+    "https://search.shopping.naver.com/*",
+    "https://shopping.naver.com/*",
+    "https://msearch.shopping.naver.com/*"
                          ],
     "content_scripts":  [
                             {
