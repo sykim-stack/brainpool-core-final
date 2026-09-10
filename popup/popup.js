@@ -209,7 +209,7 @@ async function captureActiveProduct() {
     const product = result.extracted || {};
     const statusText = result.duplicate
       ? `기존 후보 사용\n${product.internal_code || result.message_id}`
-      : `저장 완료\n${product.internal_code || ''}\nMessage ID: ${result.message_id || '없음'}`;
+      : `${product.entity_type === 'market_research' ? '시장조사 저장 완료' : '저장 완료'}\n${product.internal_code || ''}\nMessage ID: ${result.message_id || '없음'}`;
     status.textContent = statusText;
     chrome.storage.local.set({ lastProductCaptureStatus: { text: statusText, at: new Date().toISOString() } });
   } catch (error) {

@@ -167,8 +167,10 @@ async function handleHajunProductCapture(data = {}) {
   if (internal_code !== expectedCode) return { success: false, error: `internal_code는 ${expectedCode} 형식이어야 합니다.` };
   if (!content || !String(content).trim()) return { success: false, error: '저장할 상품 원문이 없습니다.' };
 
+  const entityType = data.entity_type === 'market_research' ? 'market_research' : 'product_candidate';
+  const isResearch = entityType === 'market_research';
   const localCapture = await chrome.storage.local.get(`product_capture:${internal_code}`);
-  if (localCapture[`product_capture:${internal_code}`]) {
+  if (!isResearch && localCapture[`product_capture:${internal_code}`]) {
     return {
       success: true,
       duplicate: true,
@@ -185,7 +187,7 @@ async function handleHajunProductCapture(data = {}) {
     m.metadata?.entity_type === 'product_candidate' ||
     String(m.content || '').includes(`[상품식별코드: ${internal_code}]`)
   );
-  if (sourceMessage) {
+  if (!isResearch && sourceMessage) {
     return {
       success: true,
       duplicate: true,
@@ -202,12 +204,12 @@ async function handleHajunProductCapture(data = {}) {
       room_key,
       author_type: 'human',
       author_name: data.author_name || `${source} 캡처`,
-      msg_type: 'doc_injection',
+      msg_type: data.msg_type || (isResearch ? 'work_result' : 'doc_injection'),
       content: `[상품식별코드: ${internal_code}]\n[출처: ${source}]\n[원문 URL: ${source_url || ''}]\n[캡처시각: ${captured_at || new Date().toISOString()}]\n\n${String(content).trim()}`,
       ref_ids: [],
       metadata: {
         ...metadata,
-        entity_type: 'product_candidate',
+        entity_type: entityType,
         internal_code,
         source,
         source_product_code,
@@ -219,7 +221,9 @@ async function handleHajunProductCapture(data = {}) {
   });
   if (result._error) return { success: false, error: result._error };
   const payload = result.payload || null;
-  await chrome.storage.local.set({ [`product_capture:${internal_code}`]: payload || { internal_code, saved_at: new Date().toISOString() } });
+  if (!isResearch) {
+    await chrome.storage.local.set({ [`product_capture:${internal_code}`]: payload || { internal_code, saved_at: new Date().toISOString() } });
+  }
   return {
     success: true,
     duplicate: false,

@@ -136,3 +136,12 @@ git diff --check
 - 검증: `node --check background.js`, `content.js`, `content/product-content.js`, `popup/popup.js`, `git diff --check` 통과
 - 다음 작업: Chrome 확장 프로그램을 새로고침한 뒤 마당·방 선택 → 선택 공간 저장 → 팝업 재개방으로 실제 확인
 - 주의: 브라우저의 확장 프로그램 저장소를 직접 확인해야 하므로 현재 정적 검증만 완료
+
+### 작업 로그: 2026-09-10 23:58
+- 담당: Manus
+- 작업: 네이버 검색·상품 페이지 수동 시장조사 extractor를 온채널 캡처 흐름에 연결
+- 변경 파일: `content/product-content.js`, `background.js`, `popup/popup.html`, `popup/popup.js`, `manifest.json`
+- HajunAI 계약 상태: 네이버 캡처는 `entity_type=market_research`, `source=naver`, `internal_code=naver:source_product_code`로 저장하며 원문·가격·리뷰·키워드·URL을 보존한다. 자동 로그인·대량 순회·자동 확정은 하지 않는다.
+- 검증: `node --check background.js`, `content.js`, `content/product-content.js`, `popup/popup.js`, manifest JSON 파싱, `git diff --check` 통과
+- 다음 작업: Chrome에서 네이버 검색·상품 페이지를 열고 팝업에서 상품검증마당·시장조사방을 선택한 뒤 수동 캡처 및 HajunAI 저장 결과 확인
+- 주의: 네이버 페이지 구조가 바뀌면 추출 필드가 누락될 수 있으며, 검색어 기반 `internal_code`는 동일상품 자동 확정용이 아니다.

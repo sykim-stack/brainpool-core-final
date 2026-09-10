@@ -32,7 +32,9 @@
                              "https://gemini.google.com/*",
                              "https://www.perplexity.ai/*",
     "https://api.notion.com/*",
-    "https://hajuncore-app.vercel.app/*"
+    "https://hajuncore-app.vercel.app/*",
+    "https://*.naver.com/*",
+    "https://*.naver.net/*"
                          ],
     "content_scripts":  [
                             {
