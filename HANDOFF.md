@@ -25,9 +25,9 @@ git status --short --branch
 - 하준아이 마당·방 선택: 구현됨
 - 선택한 방 메시지 저장: 구현됨
 - 선택한 방 맥락의 외부 AI 입력창 주입: 구현됨
-- 상품검증 온채널 추출기: 미구현
+- 상품검증 온채널 수동 추출기: 구현됨
 - 상품검증 네이버 조사 추출기: 미구현
-- 상품 캡처 전송: 계약 고정, 구현 전
+- 상품 캡처 전송·중복 방지·message ID 표시: 구현됨
 
 ## 공유 계약
 
@@ -42,14 +42,11 @@ internal_code = source:source_product_code
 
 ## 다음 작업 순서
 
-1. `hajuncore-app`에서 실제 상품검증마당·방 key와 `metadata` 컬럼을 확인한다.
-2. HajunAI 캡처 저장 API가 확정될 때까지 온채널·네이버 추출기를 구현하지 않는다.
-3. 온채널 수동 캡처를 별도 content extractor와 popup action으로 추가한다.
-4. 캡처 payload에 `internal_code`, 원문, source URL, captured_at을 포함한다.
-5. HajunAI 저장 응답의 message ID를 보존한다.
-6. 같은 상품 재캡처 시 새 원문을 두 저장소에 복제하지 않는다.
-7. 네이버 조사는 같은 `internal_code`에 연결하되 동일상품 자동 확정은 하지 않는다.
-8. 저장·중복·ref_ids·실패 시 원문 보존을 양쪽에서 함께 검증한다.
+1. 온채널 수동 캡처를 운영 Chrome에서 실제 테스트한다.
+2. 동일 상품 재캡처 시 local storage·HajunAI 양쪽 중복 방지를 검증한다.
+3. 캡처 실패·페이지 원문 누락·잘못된 방 선택 오류를 확인한다.
+4. 네이버 조사 캡처는 별도 구현하되 동일상품 자동 확정은 하지 않는다.
+5. 저장·중복·ref_ids·실패 시 원문 보존을 양쪽에서 함께 검증한다.
 
 ## 작업 중단 기록
 
@@ -121,3 +118,12 @@ git diff --check
 - 결과: `product_validation` 마당, 4개 기능방, `hajun_messages.metadata jsonb` 컬럼 생성 확인
 - 검증: Supabase MCP 조회와 운영 API의 `room_list&yard=product_validation` 응답 확인
 - 주의: `hajunai` 프로젝트에는 Hajun 테이블이 없으므로 운영 DB로 사용하지 않음. 상품 후보 조회 API는 별도 배포 코드 확인이 필요함
+
+### 작업 로그: 2026-09-10 15:01
+- 담당: Manus 2
+- 작업: 원격 최신 코어 파이널과 운영 HajunAI를 재검증하고 인수인계 상태를 실제 구현에 맞게 정정
+- 결과: 코어 파이널 `master=0f717b5`; 상품검증 온채널 수동 캡처·중복 방지·팝업 상태 저장 구현 확인
+- 운영 확인: `product_validation` 마당과 `product_discovery`, `market_research`, `product_validation`, `approved_products` 4개 방 확인; `product_candidates` 5건 확인
+- 검증: 코어 파이널 4개 JS `node --check` 통과; 운영 API `product_candidates`와 `product_random` 응답 확인
+- 다음 작업: 실제 Chrome 온채널 상세페이지에서 캡처 버튼을 눌러 저장·중복 결과 확인
+- 주의: 네이버 조사 extractor와 승인 승격 흐름은 아직 미구현
