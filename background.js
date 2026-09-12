@@ -41,6 +41,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'GET_HAJUN_SUPPLIER_CANDIDATES') {
+    getHajunSupplierCandidates(msg.roomId).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
   if (msg.type === 'INJECT_HAJUN_CONTEXT') {
     injectHajunContext(msg.tabId, msg.data).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
     return true;
@@ -90,6 +95,13 @@ async function getHajunRecommendations(roomId) {
   const result = await hajunFetch(`/api/hajun?action=recommendations&room_id=${encodeURIComponent(roomId)}`);
   if (result._error) return { success: false, error: result._error };
   return { success: true, recommendations: result.payload?.recommendations || [] };
+}
+
+async function getHajunSupplierCandidates(roomId) {
+  if (!roomId) return { success: false, error: '상품발굴방을 찾을 수 없습니다.' };
+  const result = await hajunFetch(`/api/hajun?action=supplier_candidates&room_id=${encodeURIComponent(roomId)}`);
+  if (result._error) return { success: false, error: result._error };
+  return { success: true, candidates: result.payload?.candidates || [] };
 }
 
 function buildHajunContext({ yard, room, messages }) {
@@ -257,7 +269,9 @@ async function captureActiveProduct(tabId, space = {}) {
     const saved = await handleHajunProductCapture({
       ...extracted,
       ...space,
-      ref_ids: space.recommendation_message_id ? [space.recommendation_message_id] : []
+      ref_ids: extracted.entity_type === 'market_research'
+        ? (space.supplier_candidate_message_id ? [space.supplier_candidate_message_id] : [])
+        : (space.recommendation_message_id ? [space.recommendation_message_id] : [])
     });
     return { ...saved, extracted };
   } catch (error) {

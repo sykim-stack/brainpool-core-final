@@ -157,16 +157,38 @@ async function refreshRecommendationOptions() {
   const space = getSelectedHajunSpace();
   if (space.room_key !== 'product_discovery') {
     select.innerHTML = '<option value="">상품발굴방을 선택하면 추천을 연결할 수 있습니다</option>';
+  } else {
+    const yard = hajunSpaces.find((item) => item.key === space.yard_key);
+    const room = (yard?.rooms || []).find((item) => item.key === space.room_key);
+    if (room) {
+      const result = await sendMessageToBg({ type: 'GET_HAJUN_RECOMMENDATIONS', roomId: room.id });
+      const recommendations = result?.recommendations || [];
+      select.innerHTML = '<option value="">연결할 AI 추천 선택 (선택사항)</option>' + recommendations.map((message) => {
+        const text = String(message.content || '').replace(/\s+/g, ' ').slice(0, 70);
+        return `<option value="${message.id}">${text || 'AI 추천'} · ${new Date(message.created_at || Date.now()).toLocaleDateString()}</option>`;
+      }).join('');
+    }
+  }
+  await refreshSupplierOptions();
+}
+
+async function refreshSupplierOptions() {
+  const select = document.getElementById('hajunSupplierSelect');
+  if (!select) return;
+  const space = getSelectedHajunSpace();
+  if (space.room_key !== 'market_research') {
+    select.innerHTML = '<option value="">시장조사방을 선택하면 공급처 후보를 연결할 수 있습니다</option>';
     return;
   }
   const yard = hajunSpaces.find((item) => item.key === space.yard_key);
-  const room = (yard?.rooms || []).find((item) => item.key === space.room_key);
+  const room = (yard?.rooms || []).find((item) => item.key === 'product_discovery');
   if (!room) return;
-  const result = await sendMessageToBg({ type: 'GET_HAJUN_RECOMMENDATIONS', roomId: room.id });
-  const recommendations = result?.recommendations || [];
-  select.innerHTML = '<option value="">연결할 AI 추천 선택 (선택사항)</option>' + recommendations.map((message) => {
-    const text = String(message.content || '').replace(/\s+/g, ' ').slice(0, 70);
-    return `<option value="${message.id}">${text || 'AI 추천'} · ${new Date(message.created_at || Date.now()).toLocaleDateString()}</option>`;
+  const result = await sendMessageToBg({ type: 'GET_HAJUN_SUPPLIER_CANDIDATES', roomId: room.id });
+  const candidates = result?.candidates || [];
+  select.innerHTML = '<option value="">연결할 공급처 후보 선택 (선택사항)</option>' + candidates.map((message) => {
+    const metadata = message.metadata || {};
+    const label = metadata.name || message.content || metadata.internal_code || '공급처 후보';
+    return `<option value="${message.id}">${String(label).replace(/\s+/g, ' ').slice(0, 70)}</option>`;
   }).join('');
 }
 
@@ -203,7 +225,8 @@ function getSelectedHajunSpace() {
     room_key: document.getElementById('hajunRoomSelect')?.value || '',
     msg_type: document.getElementById('hajunMsgTypeSelect')?.value || 'work_result',
     author_name: document.getElementById('hajunAuthorName')?.value.trim() || '외부 AI',
-    recommendation_message_id: document.getElementById('hajunRecommendationSelect')?.value || ''
+    recommendation_message_id: document.getElementById('hajunRecommendationSelect')?.value || '',
+    supplier_candidate_message_id: document.getElementById('hajunSupplierSelect')?.value || ''
   };
 }
 
