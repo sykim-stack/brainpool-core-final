@@ -144,10 +144,30 @@ async function loadHajunSpaces() {
   };
   populateRooms();
   if (status) status.textContent = '하준아이 master 연결됨 · 마당과 방을 선택하세요.';
-  yardSelect.onchange = () => { populateRooms(); persistSelectedHajunSpace(); };
-  roomSelect.onchange = persistSelectedHajunSpace;
+  yardSelect.onchange = async () => { populateRooms(); await persistSelectedHajunSpace(); await refreshRecommendationOptions(); };
+  roomSelect.onchange = async () => { await persistSelectedHajunSpace(); await refreshRecommendationOptions(); };
   document.getElementById('hajunMsgTypeSelect').onchange = persistSelectedHajunSpace;
   document.getElementById('hajunAuthorName').oninput = persistSelectedHajunSpace;
+  await refreshRecommendationOptions();
+}
+
+async function refreshRecommendationOptions() {
+  const select = document.getElementById('hajunRecommendationSelect');
+  if (!select) return;
+  const space = getSelectedHajunSpace();
+  if (space.room_key !== 'product_discovery') {
+    select.innerHTML = '<option value="">상품발굴방을 선택하면 추천을 연결할 수 있습니다</option>';
+    return;
+  }
+  const yard = hajunSpaces.find((item) => item.key === space.yard_key);
+  const room = (yard?.rooms || []).find((item) => item.key === space.room_key);
+  if (!room) return;
+  const result = await sendMessageToBg({ type: 'GET_HAJUN_RECOMMENDATIONS', roomId: room.id });
+  const recommendations = result?.recommendations || [];
+  select.innerHTML = '<option value="">연결할 AI 추천 선택 (선택사항)</option>' + recommendations.map((message) => {
+    const text = String(message.content || '').replace(/\s+/g, ' ').slice(0, 70);
+    return `<option value="${message.id}">${text || 'AI 추천'} · ${new Date(message.created_at || Date.now()).toLocaleDateString()}</option>`;
+  }).join('');
 }
 
 function persistSelectedHajunSpace() {
@@ -182,7 +202,8 @@ function getSelectedHajunSpace() {
     yard_key: document.getElementById('hajunYardSelect')?.value || '',
     room_key: document.getElementById('hajunRoomSelect')?.value || '',
     msg_type: document.getElementById('hajunMsgTypeSelect')?.value || 'work_result',
-    author_name: document.getElementById('hajunAuthorName')?.value.trim() || '외부 AI'
+    author_name: document.getElementById('hajunAuthorName')?.value.trim() || '외부 AI',
+    recommendation_message_id: document.getElementById('hajunRecommendationSelect')?.value || ''
   };
 }
 

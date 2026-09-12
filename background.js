@@ -36,6 +36,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'GET_HAJUN_RECOMMENDATIONS') {
+    getHajunRecommendations(msg.roomId).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
   if (msg.type === 'INJECT_HAJUN_CONTEXT') {
     injectHajunContext(msg.tabId, msg.data).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
     return true;
@@ -78,6 +83,13 @@ async function getHajunSpaces() {
     return { ...yard, rooms: rooms.payload?.rooms || [], error: rooms._error || null };
   }));
   return { success: true, yards: list };
+}
+
+async function getHajunRecommendations(roomId) {
+  if (!roomId) return { success: false, error: '상품발굴방을 선택해주세요.' };
+  const result = await hajunFetch(`/api/hajun?action=recommendations&room_id=${encodeURIComponent(roomId)}`);
+  if (result._error) return { success: false, error: result._error };
+  return { success: true, recommendations: result.payload?.recommendations || [] };
 }
 
 function buildHajunContext({ yard, room, messages }) {
@@ -158,7 +170,8 @@ async function handleHajunProductCapture(data = {}) {
     content,
     source_url,
     captured_at,
-    metadata = {}
+    metadata = {},
+    ref_ids = []
   } = data;
 
   if (!yard_key || !room_key) return { success: false, error: '상품검증마당과 방을 선택해주세요.' };
@@ -206,7 +219,7 @@ async function handleHajunProductCapture(data = {}) {
       author_name: data.author_name || `${source} 캡처`,
       msg_type: data.msg_type || (isResearch ? 'work_result' : 'doc_injection'),
       content: `[상품식별코드: ${internal_code}]\n[출처: ${source}]\n[원문 URL: ${source_url || ''}]\n[캡처시각: ${captured_at || new Date().toISOString()}]\n\n${String(content).trim()}`,
-      ref_ids: [],
+      ref_ids: isResearch ? [] : (Array.isArray(ref_ids) ? ref_ids : []),
       metadata: {
         ...metadata,
         entity_type: entityType,
@@ -241,7 +254,11 @@ async function captureActiveProduct(tabId, space = {}) {
     await new Promise(resolve => setTimeout(resolve, 150));
     const extracted = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_PRODUCT' });
     if (!extracted || extracted.error) return { success: false, error: extracted?.error || '상품 원문 추출 실패' };
-    const saved = await handleHajunProductCapture({ ...extracted, ...space });
+    const saved = await handleHajunProductCapture({
+      ...extracted,
+      ...space,
+      ref_ids: space.recommendation_message_id ? [space.recommendation_message_id] : []
+    });
     return { ...saved, extracted };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
